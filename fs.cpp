@@ -37,12 +37,6 @@ int FS::format()
 	disk.write(ROOT_BLOCK, (uint8_t*)root);
 	disk.write(FAT_BLOCK, (uint8_t*)fat);
 
-	uint8_t* emptyblock = (uint8_t*)calloc(BLOCK_SIZE, 1);
-
-	//Zero memory
-	for (size_t i = 2; i < 2048; i++)
-		disk.write(i, emptyblock);
-
 	return 0;
 }
 
@@ -52,12 +46,56 @@ int FS::create(std::string filepath)
 {
 	std::cout << "FS::create(" << filepath << ")\n";
 
-	//Läser in string
-	//Läs in data från användaren
-	//Klipp strängen i BLOCK_SIZE bitar om strängen är större än en BLOCK_SIZE
-	//Skriv datan till disk
-	//Uppdatera FAT
+	size_t fileblockcount = 0;
 
+	//Read input from user.
+	std::string input, result;
+	while (getline(std::cin, input) && !input.empty())
+		result += input;
+
+	//Split the string in to BLOCK_SIZE big parts if the string is bigger than one BLOCK_SIZE and write to disk.
+	if (result.size() < BLOCK_SIZE)
+	{
+		char* strblock = (char*)calloc(BLOCK_SIZE, 1);
+		result.copy(strblock, BLOCK_SIZE);
+		disk.write(3, (uint8_t*)strblock);
+	}
+	else
+	{
+		char* strblock = (char*)calloc(BLOCK_SIZE, 1);
+		size_t i = 0, fileblockcount = 0;
+		while (result.copy(strblock, BLOCK_SIZE, i) == BLOCK_SIZE) //Copy string to strblock while the amount of copied characters is BLOCK_SIZE.
+		{
+			disk.write(fileblockcount++ + 3, (uint8_t*)strblock);
+			i += BLOCK_SIZE;
+		}
+
+		//Write last block of the file to disk.
+		disk.write(++fileblockcount + 3, (uint8_t*)strblock);
+	}
+
+	//Read root block and add dir entry for file.
+	dir_entry* rootblock = (dir_entry*)malloc(BLOCK_SIZE);
+	disk.read(ROOT_BLOCK, (uint8_t*)rootblock);
+
+
+	dir_entry* fentry{ 0 };
+	filepath.copy(fentry->file_name, filepath.size());
+	fentry->access_rights = READ | WRITE | EXECUTE;
+	fentry->first_blk = 3;
+	fentry->type = TYPE_FILE;
+	fentry->size = result.size();
+
+	rootblock[1] = *fentry;
+
+
+	//Uppdate FAT
+	disk.read(FAT_BLOCK, (uint8_t*)rootblock); //Read fat block
+	uint16_t* fatblock = (uint16_t*)rootblock;
+	for (size_t i = 0; i < fileblockcount; i++)
+		fatblock[i + 2] = (i + 3);
+
+	disk.write(FAT_BLOCK, (uint8_t*)fatblock);
 	return 0;
 }
 
