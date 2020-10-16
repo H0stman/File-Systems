@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdint>
+#include <vector>
 #include "disk.h"
 
 #ifndef __FS_H__

@@ -4,6 +4,7 @@
 FS::FS()
 {
 	std::cout << "FS::FS()... Creating file system\n";
+	disk.read(FAT_BLOCK, (uint8_t*)fat);
 }
 
 FS::~FS()
@@ -50,7 +51,7 @@ int FS::create(std::string filepath)
 
 	//Read input from user.
 	std::string input, result;
-	while (getline(std::cin, input) && !input.empty())
+	while (getline(std::cin, input) and !input.empty())
 		result += input;
 
 	//Split the string in to BLOCK_SIZE big parts if the string is bigger than one BLOCK_SIZE and write to disk.
@@ -88,14 +89,11 @@ int FS::create(std::string filepath)
 
 	rootblock[1] = *fentry;
 
-
-	//Uppdate FAT
-	disk.read(FAT_BLOCK, (uint8_t*)rootblock); //Read fat block
-	uint16_t* fatblock = (uint16_t*)rootblock;
+	//Uppdate the FAT
 	for (size_t i = 0; i < fileblockcount; i++)
-		fatblock[i + 2] = (i + 3);
-
-	disk.write(FAT_BLOCK, (uint8_t*)fatblock);
+		fat[i + 2] = (i + 3);
+	fat[fileblockcount + 2] = FAT_EOF; //Set last box to EOF.
+	disk.write(FAT_BLOCK, (uint8_t*)fat);
 	return 0;
 }
 
@@ -103,6 +101,35 @@ int FS::create(std::string filepath)
 int FS::cat(std::string filepath)
 {
 	std::cout << "FS::cat(" << filepath << ")\n";
+
+	//Read the root block.
+	dir_entry* rootblock = (dir_entry*)malloc(BLOCK_SIZE);
+	disk.read(ROOT_BLOCK, (uint8_t*)rootblock);
+
+	//Only looking for a single file in the root folder for this implementation. I'm also asuming the file exists.
+	dir_entry* fileentry;
+	for (dir_entry* it = rootblock; !filepath.compare(it->file_name); it++)
+		fileentry = it;
+
+	//Read the FAT block.
+	uint16_t* fatblock = (uint16_t*)malloc(BLOCK_SIZE);
+	disk.read(FAT_BLOCK, (uint8_t*)fatblock);
+
+	std::vector<uint16_t> fileblockindex = { 0 }; //Vector containing the indices of every block the file occupies.
+
+	fileblockindex.push_back(fileentry->first_blk); //Push the first FAT index of the file.
+
+	//This forloop will jump to the index of the next block which the file is occupying in the FAT until it reaches FAT_EOF.
+	for (uint16_t* it = fatblock; *it not_eq FAT_EOF; it += (*it - (it - fatblock) / 2)) 
+		fileblockindex.push_back(*it);
+
+
+	
+	for (size_t i = 0; i < fileblockindex.size(); i++) //Itterate through indices and read the content of the block on that index.
+	{
+		
+	}
+	
 	return 0;
 }
 
