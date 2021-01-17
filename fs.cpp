@@ -168,7 +168,7 @@ int FS::cat(std::string filepath)
 	uint8_t block[BLOCK_SIZE];
 	//Read the block.
 	disk.read(entry->first_blk, block);
-	
+
 	//This for-loop will start on the first block of the file and jump to the next block which the file is occupying in the FAT until it reaches FAT_EOF.
 	for (int16_t *it = fat + entry->first_blk; *it not_eq FAT_EOF; it += (*it - (it - fat) / sizeof(int16_t)))
 	{
@@ -250,8 +250,8 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		uint8_t sourceBlock[BLOCK_SIZE];
 		disk.read(sourceDir->first_blk, sourceBlock);
 
-		std::string s((char*)sourceBlock);
-		
+		std::string s((char *)sourceBlock);
+
 		//Add the size of the block to the dataSize
 		dataSize += s.length();
 
@@ -276,7 +276,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		{
 			disk.read(fatNr, sourceBlock);
 
-			std::string s((char*)sourceBlock);
+			std::string s((char *)sourceBlock);
 
 			//Add the size of the block to the dataSize
 			dataSize += s.length();
@@ -345,11 +345,12 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	std::cout << "FS::mv(" << sourcepath << "," << destpath << ")\n";
 
 	//If filename is too long
-	if(destpath.length() > 56){
+	if (destpath.length() > 56)
+	{
 		std::cout << "Error! New filename is too long!" << std::endl;
 		return -1;
 	}
-	
+
 	//Read root block.
 	dir_entry *rootblock = (dir_entry *)new char[BLOCK_SIZE];
 	disk.read(ROOT_BLOCK, (uint8_t *)rootblock);
@@ -369,16 +370,16 @@ int FS::mv(std::string sourcepath, std::string destpath)
 int FS::rm(std::string filepath)
 {
 	std::cout << "FS::rm(" << filepath << ")\n";
-	
+
 	uint8_t block[BLOCK_SIZE];
 
 	disk.read(ROOT_BLOCK, block);
 
-	dir_entry* entry;
+	dir_entry *entry;
 	size_t i = 0;
-	for(dir_entry* it = reinterpret_cast<dir_entry*>(block); filepath.compare(it->file_name); entry = ++it)
+	for (dir_entry *it = reinterpret_cast<dir_entry *>(block); filepath.compare(it->file_name); entry = ++it)
 	{
-		if(i++ > std::floor(BLOCK_SIZE / sizeof(dir_entry)))
+		if (i++ > std::floor(BLOCK_SIZE / sizeof(dir_entry)))
 		{
 			std::cout << "Could not find file or directory on path " << filepath << std::endl;
 			return 1;
@@ -390,11 +391,11 @@ int FS::rm(std::string filepath)
 	{
 		save = fat[i];
 		fat[i] = FAT_FREE;
-		if(save = EOF)
+		if (save = EOF)
 			break;
 	}
-	
-	dir_entry* root = (dir_entry*)block;
+
+	dir_entry *root = (dir_entry *)block;
 	root->size -= entry->size;
 
 	entry->access_rights = 0u;
@@ -425,22 +426,25 @@ int FS::append(std::string filepath1, std::string filepath2)
 	uint8_t block[BLOCK_SIZE];
 	int dataSize = 0;
 
-	if(nrBlocks > 1){
+	if (nrBlocks > 1)
+	{
 		newBlocks = std::ceil(nrBlocks) - 1;
 
 		//If its just 1 block that is to be appended.
-		if(newBlocks == 1){
+		if (newBlocks == 1)
+		{
 			empty_spots[0] = find_empty();
-			if(empty_spots[0] == -1)
+			if (empty_spots[0] == -1)
 			{
 				std::cout << "ERROR! Not enough empty spots in the FAT." << std::endl;
 				return -1;
 			}
 		}
 		//If multiple blocks are to be appended.
-		else{
+		else
+		{
 			empty_spots = find_multiple_empty(nrBlocks);
-			if(empty_spots[0] == -1)
+			if (empty_spots[0] == -1)
 			{
 				std::cout << "ERROR! Not enough empty spots in the FAT." << std::endl;
 				return -1;
@@ -449,14 +453,15 @@ int FS::append(std::string filepath1, std::string filepath2)
 
 		int fatNrSrc = sourceDir->first_blk;
 		int fatNrDest = destDir->first_blk;
-		while(fat[fatNrDest] != FAT_EOF){
+		while (fat[fatNrDest] != FAT_EOF)
+		{
 			fatNrDest = fat[fatNrDest];
 		}
 
 		//Read the first block that is to be appended.
 		disk.read(fatNrSrc, block);
 		//Put the data into a string.
-		std::string s((char*)block);
+		std::string s((char *)block);
 
 		//Add the size of the data to the dataSize
 		dataSize += s.length();
@@ -470,12 +475,12 @@ int FS::append(std::string filepath1, std::string filepath2)
 
 		//The empty bytes available in the destination block.
 		int emptyBytes = BLOCK_SIZE - (destDir->size % BLOCK_SIZE);
-		
+
 		//Add data from source to the dest string.
 		s2 += s;
 
 		memset(block, 0, BLOCK_SIZE);
-		//Copy emptyBytes amount of characters from 
+		//Copy emptyBytes amount of characters from
 		s2.copy((char *)block, BLOCK_SIZE);
 		//Erase the chars that was copied into block.
 		s2.erase(0, BLOCK_SIZE - 1);
@@ -485,13 +490,14 @@ int FS::append(std::string filepath1, std::string filepath2)
 		//The data that did not fit in that block is still stored in s2.
 
 		int i = 0;
-		while(i < newBlocks){
-			if(fat[fatNrSrc] != -1){
+		while (i < newBlocks)
+		{
+			if (fat[fatNrSrc] != -1)
+			{
 				fatNrSrc = fat[fatNrSrc];
 				disk.read(fatNrSrc, block);
 
-				s2.append((char*)block);
-				
+				s2.append((char *)block);
 			}
 			memset(block, 0, BLOCK_SIZE);
 			dataSize += s2.copy((char *)block, BLOCK_SIZE);
@@ -501,19 +507,19 @@ int FS::append(std::string filepath1, std::string filepath2)
 			memset(block, 0, BLOCK_SIZE);
 			i++;
 		}
-
 	}
-	else{
+	else
+	{
 		newBlocks = 0;
 
 		disk.read(sourceDir->first_blk, block);
-		std::string s((char*)block);
+		std::string s((char *)block);
 		memset(block, 0, BLOCK_SIZE);
 		disk.read(destDir->first_blk, block);
 
 		dataSize += s.length();
 
-		s.append((char*)block);
+		s.append((char *)block);
 		memset(block, 0, BLOCK_SIZE);
 		s.copy((char *)block, s.length());
 		disk.write(destDir->first_blk, block);
@@ -521,16 +527,18 @@ int FS::append(std::string filepath1, std::string filepath2)
 
 	//Update the FAT
 	int fatNr = destDir->first_blk;
-	while(fat[fatNr] != FAT_EOF){
+	while (fat[fatNr] != FAT_EOF)
+	{
 		fatNr = fat[fatNr];
 	}
 
-	for(int i = 0; i < newBlocks; i++){
+	for (int i = 0; i < newBlocks; i++)
+	{
 		fat[fatNr] = empty_spots[i];
 		fatNr = fat[fatNr];
 	}
 	fat[fatNr] = FAT_EOF;
-	
+
 	//Read root block.
 	dir_entry *rootblock = (dir_entry *)new char[BLOCK_SIZE];
 	disk.read(ROOT_BLOCK, (uint8_t *)rootblock);
@@ -636,7 +644,7 @@ dir_entry *FS::find_filedata(std::string filepath)
 	uint8_t *block = new uint8_t[BLOCK_SIZE];
 	disk.read(ROOT_BLOCK, block);
 
-	if(filepath.find('/') == std::string::npos)
+	if (filepath.find('/') == std::string::npos)
 		filepath += '/';
 
 	size_t start_i = 0, end_i = 0, i = 0;
