@@ -1,6 +1,9 @@
 #include <iostream>
 #include <cstdint>
 #include <vector>
+#include <cmath>
+#include <cstring>
+#include <array>
 #include "disk.h"
 
 #ifndef __FS_H__
@@ -32,6 +35,12 @@ private:
     Disk disk;
     // size of a FAT entry is 2 bytes
     int16_t fat[BLOCK_SIZE / 2];
+
+    //Helper functions
+    int find_empty();
+    std::vector<int> find_multiple_empty(int numBlocks);
+    dir_entry* find_filedata(const std::string filepath);
+
 public:
     FS();
     ~FS();
