@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <array>
+#include <algorithm>
 #include "disk.h"
 
 #ifndef __FS_H__
@@ -39,8 +40,10 @@ private:
     //Helper functions
     int find_empty();
     std::vector<int> find_multiple_empty(int numBlocks);
-    dir_entry* find_filedata(const std::string filepath);
+    dir_entry find_dir_entry(const std::string filepath);
+    int updateSize(uint32_t size, std::string updateFrom);
 
+    std::string path;
 public:
     FS();
     ~FS();
