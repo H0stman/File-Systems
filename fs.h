@@ -28,6 +28,11 @@ struct dir_entry
     uint32_t size; // size of the file in bytes
     uint8_t type; // directory (1) or file (0)
     uint8_t access_rights; // read (0x04), write (0x02), execute (0x01)
+
+    dir_entry() noexcept : first_blk(0), size(0), type(0), access_rights(0)
+    {
+        std::fill(file_name, file_name + sizeof(file_name) - 1, 0);
+    }
 };
 
 class FS
