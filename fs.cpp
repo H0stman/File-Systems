@@ -4,7 +4,7 @@
 FS::FS()
 {
 	std::cout << "FS::FS()... Creating file system\n";
-	disk.read(FAT_BLOCK, (uint8_t *)fat);
+	disk.read(FAT_BLOCK, (uint8_t*)fat);
 	path = "/";
 }
 
@@ -19,14 +19,14 @@ int FS::format()
 
 	//Set the whole disk to 0.
 	int nrBlocks = disk.get_no_blocks();
-	uint8_t zeroblob[BLOCK_SIZE] = {0};
+	uint8_t zeroblob[BLOCK_SIZE] = { 0 };
 	for (int i = 0; i < nrBlocks; i++)
 		disk.write(i, zeroblob);
 
 	//Configure root direcotry block
-	std::string name("root");
-	uint8_t blob[BLOCK_SIZE] = {0};
-	dir_entry *root = (dir_entry *)blob;
+	std::string name("/");
+	uint8_t blob[BLOCK_SIZE] = { 0 };
+	dir_entry* root = (dir_entry*)blob;
 	root->access_rights = READ | WRITE | EXECUTE;
 	name.copy(root->file_name, name.size());
 	root->first_blk = ROOT_BLOCK;
@@ -42,8 +42,8 @@ int FS::format()
 		fat[i] = FAT_FREE;
 
 	//Write blocks to disk
-	disk.write(ROOT_BLOCK, (uint8_t *)root);
-	disk.write(FAT_BLOCK, (uint8_t *)fat);
+	disk.write(ROOT_BLOCK, (uint8_t*)root);
+	disk.write(FAT_BLOCK, (uint8_t*)fat);
 
 	path = "/";
 
@@ -59,7 +59,7 @@ int FS::create(std::string filepath)
 	//Check if the filepath entered already exists.
 	if (find_dir_entry(filepath).file_name[0] != '\0')
 	{
-		std::cout << "Error! That file or directory already exists." << std::endl;
+		std::cerr << "Error! That file or directory already exists." << std::endl;
 		return -1;
 	}
 
@@ -71,7 +71,7 @@ int FS::create(std::string filepath)
 	//Calculate how many blocks will be needed for the string.
 	size_t numBlocks = std::ceil((float)result.size() / (float)BLOCK_SIZE);
 	std::vector<int> empty_spots(numBlocks);
-	char strblock[BLOCK_SIZE] = {0};
+	char strblock[BLOCK_SIZE] = { 0 };
 
 	//If the string is smaller than the block size it is all put in one block.
 	if (numBlocks <= 1)
@@ -80,13 +80,13 @@ int FS::create(std::string filepath)
 		empty_spots[0] = this->find_empty();
 		if (empty_spots[0] == -1)
 		{
-			std::cout << "ERROR! No empty spots in the FAT." << std::endl;
+			std::cerr << "ERROR! No empty spots in the FAT." << std::endl;
 			return -1;
 		}
 
 		//Write the data to the disk.
 		result.copy(strblock, BLOCK_SIZE);
-		disk.write(empty_spots[0], (uint8_t *)strblock);
+		disk.write(empty_spots[0], (uint8_t*)strblock);
 	}
 	//Split the string in to BLOCK_SIZE big parts if the string is bigger than one BLOCK_SIZE and write to disk.
 	else
@@ -95,7 +95,7 @@ int FS::create(std::string filepath)
 		empty_spots = find_multiple_empty(numBlocks);
 		if (empty_spots[0] == -1)
 		{
-			std::cout << "ERROR! Not enough empty spots in the FAT." << std::endl;
+			std::cerr << "ERROR! Not enough empty spots in the FAT." << std::endl;
 			return -1;
 		}
 
@@ -103,14 +103,14 @@ int FS::create(std::string filepath)
 		size_t i = 0, j = 0;
 		while (result.copy(strblock, BLOCK_SIZE, i) == BLOCK_SIZE)
 		{
-			disk.write(empty_spots[j], (uint8_t *)strblock);
+			disk.write(empty_spots[j], (uint8_t*)strblock);
 			i += BLOCK_SIZE;
 			j++;
 			memset(strblock, '\0', BLOCK_SIZE);
 		}
 
 		//Write last block of the file to disk.
-		disk.write(empty_spots[j], (uint8_t *)strblock);
+		disk.write(empty_spots[j], (uint8_t*)strblock);
 	}
 	dir_entry currentDir;
 
@@ -145,13 +145,13 @@ int FS::create(std::string filepath)
 	//Update all the sizes in the hierarchy.
 	if (updateSize(fentry.size, filepath) == -1)
 	{
-		std::cout << "Error! Could not update the sizes." << std::endl;
+		std::cerr << "Error! Could not update the sizes." << std::endl;
 		return -1;
 	}
 
 	//Read current dir block.
-	dir_entry *dirblock = (dir_entry *)strblock;
-	disk.read(currentDir.first_blk, (uint8_t *)dirblock);
+	dir_entry* dirblock = (dir_entry*)strblock;
+	disk.read(currentDir.first_blk, (uint8_t*)dirblock);
 
 	//Find an empty spot for the new directory/file.
 	size_t k = 1;
@@ -161,7 +161,7 @@ int FS::create(std::string filepath)
 	//If there is no empty spot.
 	if (dirblock[k].file_name[0] != '\0')
 	{
-		std::cout << "ERROR! No more space for dir_entries in the current directory." << std::endl;
+		std::cerr << "ERROR! No more space for dir_entries in the current directory." << std::endl;
 		return -1;
 	}
 	//Put the new directory in the empty spot.
@@ -178,8 +178,8 @@ int FS::create(std::string filepath)
 	}
 
 	//Uppdate the FAT and current directory block ON THE DISK.
-	disk.write(FAT_BLOCK, (uint8_t *)fat);
-	disk.write(currentDir.first_blk, (uint8_t *)(dirblock));
+	disk.write(FAT_BLOCK, (uint8_t*)fat);
+	disk.write(currentDir.first_blk, (uint8_t*)(dirblock));
 	return 0;
 }
 
@@ -191,21 +191,21 @@ int FS::cat(std::string filepath)
 	dir_entry entry = find_dir_entry(filepath); //Get the dir entry for the filepath entered.
 	if (entry.file_name[0] == '\0')
 	{
-		std::cout << "Error! File does not exist." << std::endl;
+		std::cerr << "Error! File does not exist." << std::endl;
 		return 1;
 	}
 	if (entry.type == 1)
 	{
-		std::cout << "Error! That is a directory!" << std::endl;
+		std::cerr << "Error! That is a directory!" << std::endl;
 		return -1;
 	}
 	if (!(entry.access_rights & READ))
 	{
-		std::cout << "Error! You do not have access rights to read that file." << std::endl;
+		std::cerr << "Error! You do not have access rights to read that file." << std::endl;
 		return -1;
 	}
 
-	uint8_t block[BLOCK_SIZE] = {0};
+	uint8_t block[BLOCK_SIZE] = { 0 };
 	disk.read(entry.first_blk, block); //Read the first block.
 
 	//This for-loop will start on the first block of the file and jump to the next block which the file is occupying in the FAT until it reaches FAT_EOF.
@@ -225,11 +225,11 @@ int FS::ls()
 	std::cout << "FS::ls()\n";
 
 	//Read the current paths dir and block.
-	uint8_t buff[BLOCK_SIZE] = {0};
-	dir_entry *dirblock = (dir_entry *)buff;
+	uint8_t buff[BLOCK_SIZE] = { 0 };
+	dir_entry* dirblock = (dir_entry*)buff;
 	dir_entry currentDir = find_dir_entry(this->path);
-	disk.read(currentDir.first_blk, (uint8_t *)dirblock);
-	dir_entry *file_entry = nullptr;
+	disk.read(currentDir.first_blk, (uint8_t*)dirblock);
+	dir_entry* file_entry = nullptr;
 	file_entry = dirblock; //Set the first file entry to be the start of the directory block.
 
 	//Check the access rights and construct the string.
@@ -289,19 +289,19 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	dir_entry sourceDir = find_dir_entry(sourcefilepath);
 	if (sourceDir.file_name[0] == '\0')
 	{
-		std::cout << "Error! Source not found." << std::endl;
+		std::cerr << "Error! Source not found." << std::endl;
 		return -1;
 	}
 
 	if (sourceDir.type == 1)
 	{
-		std::cout << "Error! Source is a directory, not a file." << std::endl;
+		std::cerr << "Error! Source is a directory, not a file." << std::endl;
 		return -1;
 	}
 
 	if (find_dir_entry(destfilepath).file_name[0] != '\0')
 	{
-		std::cout << "Error! Destination already exists." << std::endl;
+		std::cerr << "Error! Destination already exists." << std::endl;
 		return -1;
 	}
 
@@ -316,14 +316,14 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		empty_spots[0] = find_empty();
 		if (empty_spots[0] == -1)
 		{
-			std::cout << "ERROR! No empty spots in the FAT." << std::endl;
+			std::cerr << "ERROR! No empty spots in the FAT." << std::endl;
 			return -1;
 		}
 
 		//Read the source data from the disk.
-		uint8_t sourceBlock[BLOCK_SIZE] = {0};
+		uint8_t sourceBlock[BLOCK_SIZE] = { 0 };
 		disk.read(sourceDir.first_blk, sourceBlock);
-		std::string s((char *)sourceBlock);
+		std::string s((char*)sourceBlock);
 
 		//Add the size of the block to the dataSize
 		dataSize += s.length();
@@ -336,11 +336,11 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		empty_spots = find_multiple_empty(nrBlocks);
 		if (empty_spots[0] == -1)
 		{
-			std::cout << "ERROR! Not enough empty spots in the FAT." << std::endl;
+			std::cerr << "ERROR! Not enough empty spots in the FAT." << std::endl;
 			return -1;
 		}
 
-		uint8_t sourceBlock[BLOCK_SIZE] = {0};
+		uint8_t sourceBlock[BLOCK_SIZE] = { 0 };
 		int fatNr = sourceDir.first_blk;
 
 		//Write over all the data to the found free blocks.
@@ -348,11 +348,11 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		while (i < nrBlocks)
 		{
 			disk.read(fatNr, sourceBlock);
-			std::string s((char *)sourceBlock);
+			std::string s((char*)sourceBlock);
 
 			if (i != nrBlocks - 1)
 				s.pop_back(); //Remove weird null character
-			
+
 			//Add the size of the block to the dataSize
 			dataSize += s.size();
 			disk.write(empty_spots[i], sourceBlock);
@@ -384,14 +384,14 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	//Update folders sizes.
 	if (updateSize(fentry.size, destfilepath) == -1)
 	{
-		std::cout << "Error! Could not update the sizes." << std::endl;
+		std::cerr << "Error! Could not update the sizes." << std::endl;
 		return -1;
 	}
 
 	//Read current directory block.
-	uint8_t buff[BLOCK_SIZE] = {0};
-	dir_entry *dirblock = (dir_entry *)buff;
-	disk.read(currentDir.first_blk, (uint8_t *)dirblock);
+	uint8_t buff[BLOCK_SIZE] = { 0 };
+	dir_entry* dirblock = (dir_entry*)buff;
+	disk.read(currentDir.first_blk, (uint8_t*)dirblock);
 
 	//Find an empty spot for the new directory.
 	size_t k = 1;
@@ -401,7 +401,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	//If there is no empty spot.
 	if (dirblock[k].file_name[0] != '\0')
 	{
-		std::cout << "ERROR! No more space for dir_entries in the current block." << std::endl;
+		std::cerr << "ERROR! No more space for dir_entries in the current block." << std::endl;
 		return -1;
 	}
 	else //Put the new directory in the empty spot.
@@ -417,8 +417,8 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	}
 
 	//Uppdate the FAT and current directory block ON THE DISK.
-	disk.write(FAT_BLOCK, (uint8_t *)fat);
-	disk.write(currentDir.first_blk, (uint8_t *)dirblock);
+	disk.write(FAT_BLOCK, (uint8_t*)fat);
+	disk.write(currentDir.first_blk, (uint8_t*)dirblock);
 	return 0;
 }
 
@@ -442,12 +442,12 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	currentDir = find_dir_entry(sourcepath);
 	if (currentDir.file_name[0] == '\0')
 	{
-		std::cout << "Error! The source file does not exist!" << std::endl;
+		std::cerr << "Error! The source file does not exist!" << std::endl;
 		return -1;
 	}
 	if (currentDir.type == 1)
 	{
-		std::cout << "Error! The source is a directory, not a file." << std::endl;
+		std::cerr << "Error! The source is a directory, not a file." << std::endl;
 		return -1;
 	}
 
@@ -473,13 +473,13 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	//If filename is too long
 	if (destpath.length() > 56)
 	{
-		std::cout << "Error! New filename is too long!" << std::endl;
+		std::cerr << "Error! New filename is too long!" << std::endl;
 		return -1;
 	}
 
 	//Read current block.
-	uint8_t buff[BLOCK_SIZE] = {0};
-	dir_entry *dirblock = (dir_entry *)buff;
+	uint8_t buff[BLOCK_SIZE] = { 0 };
+	dir_entry* dirblock = (dir_entry*)buff;
 
 	//If the path is relative, make it absolute.
 	if (sourcepath[0] != '/')
@@ -501,7 +501,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	//Change the dir name and write it back to disk.
 	memset(dirblock->file_name, 0, 56);
 	destpath.copy(dirblock->file_name, 56);
-	disk.write(currentDir.first_blk, (uint8_t *)buff);
+	disk.write(currentDir.first_blk, (uint8_t*)buff);
 	return 0;
 }
 
@@ -510,7 +510,7 @@ int FS::rm(std::string filepath)
 {
 	std::cout << "FS::rm(" << filepath << ")\n";
 
-	uint8_t block[BLOCK_SIZE] = {0};
+	uint8_t block[BLOCK_SIZE] = { 0 };
 	std::string temppath = "";
 
 	if (filepath[0] != '/') //Check if path is absolute.
@@ -529,14 +529,14 @@ int FS::rm(std::string filepath)
 	if (currentDir.file_name[0] == '\0')
 		return -1;
 
-	dir_entry *entry = nullptr;
+	dir_entry* entry = nullptr;
 	size_t i = 0;
 	//Look for the dir_entry in current block.
-	for (dir_entry *it = (dir_entry *)block; temppath.compare(it->file_name); entry = ++it)
+	for (dir_entry* it = (dir_entry*)block; temppath.compare(it->file_name); entry = ++it)
 	{
 		if (i++ > std::floor(BLOCK_SIZE / sizeof(dir_entry)))
 		{
-			std::cout << "Could not find file or directory on path: " << filepath << std::endl;
+			std::cerr << "Could not find file or directory on path: " << filepath << std::endl;
 			return 1;
 		}
 	}
@@ -566,7 +566,7 @@ int FS::rm(std::string filepath)
 
 	if (updateSize(-tempSize, filepath) == -1)
 	{
-		std::cout << "Error! Could not update the sizes." << std::endl;
+		std::cerr << "Error! Could not update the sizes." << std::endl;
 		return -1;
 	}
 
@@ -582,7 +582,7 @@ int FS::append(std::string filepath1, std::string filepath2)
 	dir_entry entry2 = find_dir_entry(filepath2);
 	if (entry1.file_name[0] == '\0' or entry2.file_name[0] == '\0')
 	{
-		std::cout << "Path not valid." << std::endl;
+		std::cerr << "Path not valid." << std::endl;
 		return -1;
 	}
 	uint8_t file1[BLOCK_SIZE];
@@ -604,23 +604,23 @@ int FS::append(std::string filepath1, std::string filepath2)
 	{
 		disk.read(lastfatfile2, file2);
 		disk.read(entry1.first_blk, file1);
-		uint8_t *it1 = file1;
-		uint8_t *it2 = file2 + binlastblock2;						  //End of file2.
+		uint8_t* it1 = file1;
+		uint8_t* it2 = file2 + binlastblock2;						  //End of file2.
 		for (size_t i = 0; i <= entry1.size; i++, it2++, it1++) //Copy part of first block of file1 to lst block of file2.
 			*it2 = *it1;
 		disk.write(lastfatfile2, file2);
 
 		if (updateSize(entry1.size, filepath2) == -1) //Update the sizes after the move.
 		{
-			std::cout << "Error! Could not update the sizes." << std::endl;
+			std::cerr << "Error! Could not update the sizes." << std::endl;
 			return -1;
 		}
 		return 0;
 	}
 	else
 	{
-		uint8_t *it1 = file1;					  // Copy block pointer (start)
-		uint8_t *it2 = file2 + binlastblock2; // File Endpoint
+		uint8_t* it1 = file1;					  // Copy block pointer (start)
+		uint8_t* it2 = file2 + binlastblock2; // File Endpoint
 		size_t file1blocktoread = entry1.first_blk;
 		size_t byteswandered = 0, i = 0;
 		size_t bytestocopy = lastblockfree;
@@ -662,7 +662,7 @@ int FS::append(std::string filepath1, std::string filepath2)
 
 	if (updateSize(entry1.size, filepath2) == -1) //Update the sizes after the append.
 	{
-		std::cout << "Error! Could not update the sizes." << std::endl;
+		std::cerr << "Error! Could not update the sizes." << std::endl;
 		return -1;
 	}
 	return 0;
@@ -677,7 +677,7 @@ int FS::mkdir(std::string dirpath)
 	dir_entry currentDir = find_dir_entry(dirpath);
 	if (currentDir.file_name[0] != '\0')
 	{
-		std::cout << "Error! That name already exists!" << std::endl;
+		std::cerr << "Error! That name already exists!" << std::endl;
 		return -1;
 	}
 
@@ -711,9 +711,9 @@ int FS::mkdir(std::string dirpath)
 	returnDir.access_rights = READ | WRITE | EXECUTE;
 
 	//Read current block.
-	uint8_t buff[BLOCK_SIZE] = {0};
-	dir_entry *currentblock = (dir_entry *)(buff);
-	disk.read(currentDir.first_blk, (uint8_t *)currentblock);
+	uint8_t buff[BLOCK_SIZE] = { 0 };
+	dir_entry* currentblock = (dir_entry*)(buff);
+	disk.read(currentDir.first_blk, (uint8_t*)currentblock);
 
 	//Find an empty spot for the new directory.
 	unsigned int k = 1;
@@ -723,7 +723,7 @@ int FS::mkdir(std::string dirpath)
 	//If there is no empty spot.
 	if (currentblock[k].file_name[0] != '\0')
 	{
-		std::cout << "ERROR! No more space for dir_entries in the current block." << std::endl;
+		std::cerr << "ERROR! No more space for dir_entries in the current block." << std::endl;
 		return -1;
 	}
 	//Put the new directory in the empty spot.
@@ -731,19 +731,19 @@ int FS::mkdir(std::string dirpath)
 		currentblock[k] = newDir;
 
 	//Write back the current block.
-	disk.write(currentDir.first_blk, (uint8_t *)currentblock);
+	disk.write(currentDir.first_blk, (uint8_t*)currentblock);
 
 	//Read new block, that is for the new directory entry.
-	uint8_t buff2[BLOCK_SIZE] = {0};
-	dir_entry *newblock = (dir_entry *)buff2;
+	uint8_t buff2[BLOCK_SIZE] = { 0 };
+	dir_entry* newblock = (dir_entry*)buff2;
 	newblock[0] = returnDir;
 
 	//Write the return dir.
-	disk.write(empty_spot[0], (uint8_t *)newblock);
+	disk.write(empty_spot[0], (uint8_t*)newblock);
 
 	//Update fat.
 	fat[empty_spot[0]] = FAT_EOF;
-	disk.write(FAT_BLOCK, (uint8_t *)fat);
+	disk.write(FAT_BLOCK, (uint8_t*)fat);
 
 	return 0;
 }
@@ -751,6 +751,7 @@ int FS::mkdir(std::string dirpath)
 // cd <dirpath> changes the current (working) directory to the directory named <dirpath>
 int FS::cd(std::string dirpath)
 {
+	///TODO: Rerwrite this whole finction since we do not have a folder named root anymore. And there is a simpler way of doing this.
 	std::cout << "FS::cd(" << dirpath << ")\n";
 
 	if (find_dir_entry(dirpath).file_name[0] == '\0') //Checks if path is valid.
@@ -816,9 +817,8 @@ int FS::chmod(std::string accessrights, std::string filepath)
 	disk.read(dirtoload.first_blk, block);
 
 	//Look for valid in block.
-	dir_entry *it;
-	for (it = (dir_entry *)block; std::strcmp(it->file_name, valid.file_name); it++)
-		;
+	dir_entry* it;
+	for (it = (dir_entry*)block; std::strcmp(it->file_name, valid.file_name); it++);
 
 	size_t accsessnum = std::stoul(accessrights);
 	switch (accsessnum)
@@ -905,20 +905,21 @@ std::vector<int> FS::find_multiple_empty(int numBlocks)
 //Returns the dir_entry of filepath
 dir_entry FS::find_dir_entry(std::string filepath)
 {
+	///TODO: Rerwrite this whole finction since we do not have a folder named root anymore. And there is a simpler way of doing this.
 	//Read root block.
-	uint8_t block[BLOCK_SIZE] = {0};
+	uint8_t block[BLOCK_SIZE] = { 0 };
 	disk.read(ROOT_BLOCK, block);
-	dir_entry *dirblock = (dir_entry *)(block);
+	dir_entry* dirblock = (dir_entry*)(block);
 
 	std::string fullpath("");
 
-	if (filepath.back() != '/')
-		filepath.append("/");
+	// if (filepath.back() != '/')
+	// 	filepath.append("/");
 
-	if (filepath.find("/") != 0u)
-		filepath = path + filepath;
+	// if (filepath.find("/") != 0u)
+	// 	filepath = path + filepath;
 
-	filepath = "root" + filepath;
+	//filepath = "root" + filepath;
 
 	size_t start_i = 0, end_i = 0, i = 0;
 
@@ -940,10 +941,10 @@ dir_entry FS::find_dir_entry(std::string filepath)
 		if ((end_i = filepath.find('/', end_i)) not_eq std::string::npos)
 		{
 			disk.read(dirblock->first_blk, block);
-			dirblock = (dir_entry *)block;
+			dirblock = (dir_entry*)block;
 		}
 	}
-	return ((dir_entry *)block)[i];
+	return ((dir_entry*)block)[i];
 }
 
 int FS::updateSize(uint32_t size, std::string updateFrom)
@@ -964,9 +965,9 @@ int FS::updateSize(uint32_t size, std::string updateFrom)
 			updateFrom.pop_back();
 
 		dir_entry homeFolder = find_dir_entry(updateFrom);
-		uint8_t block[BLOCK_SIZE] = {0};
+		uint8_t block[BLOCK_SIZE] = { 0 };
 		disk.read(homeFolder.first_blk, block);
-		dir_entry *entry = (dir_entry *)block;
+		dir_entry* entry = (dir_entry*)block;
 		int i = 0;
 		while (std::strcmp(file.file_name, entry->file_name) && i < std::floor(BLOCK_SIZE / sizeof(dir_entry)))
 		{
@@ -983,7 +984,7 @@ int FS::updateSize(uint32_t size, std::string updateFrom)
 		updateFrom = path + updateFrom;
 
 	dir_entry currentEntry;
-	uint8_t block[BLOCK_SIZE] = {0};
+	uint8_t block[BLOCK_SIZE] = { 0 };
 
 	while (updateFrom.find('/') != std::string::npos && updateFrom != "/")
 	{
@@ -1004,13 +1005,13 @@ int FS::updateSize(uint32_t size, std::string updateFrom)
 			currentEntry.size += size;
 
 			//Read this folder's block
-			dir_entry *dirblock = (dir_entry *)block;
-			disk.read(currentEntry.first_blk, (uint8_t *)dirblock);
+			dir_entry* dirblock = (dir_entry*)block;
+			disk.read(currentEntry.first_blk, (uint8_t*)dirblock);
 
 			//Save the index of the block where the directory lies.
 			int block_number = dirblock->first_blk;
 			//Then read the block where the directory was.
-			disk.read(dirblock->first_blk, (uint8_t *)dirblock);
+			disk.read(dirblock->first_blk, (uint8_t*)dirblock);
 
 			//Find the spot where the dir is.
 			int j = 0;
@@ -1052,7 +1053,7 @@ int FS::updateSize(uint32_t size, std::string updateFrom)
 	currentEntry.size += size;
 
 	//Read the root block.
-	dir_entry *dirblock = (dir_entry *)block;
+	dir_entry* dirblock = (dir_entry*)block;
 	disk.read(ROOT_BLOCK, block);
 
 	//Put back the updated root directory.
