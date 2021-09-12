@@ -18,9 +18,8 @@ int FS::format()
 	std::cout << "FS::format()\n";
 
 	//Set the whole disk to 0.
-	int nrBlocks = disk.get_no_blocks();
 	uint8_t zeroblob[BLOCK_SIZE] = { 0 };
-	for (int i = 0; i < nrBlocks; i++)
+	for (unsigned int i = 0; i < disk.get_no_blocks(); i++)
 		disk.write(i, zeroblob);
 
 	//Configure root direcotry block
@@ -38,7 +37,7 @@ int FS::format()
 	fat[1] = FAT_EOF;
 
 	//Mark rest of blocks as FAT_FREE
-	for (int i = 2; i < nrBlocks; i++)
+	for (unsigned int i = 2; i < disk.get_no_blocks(); i++)
 		fat[i] = FAT_FREE;
 
 	//Write blocks to disk
@@ -55,6 +54,8 @@ int FS::format()
 int FS::create(std::string filepath)
 {
 	std::cout << "FS::create(" << filepath << ")\n";
+
+	auto exist = get_entry(filepath);
 
 	//Check if the filepath entered already exists.
 	if (find_dir_entry(filepath).file_name[0] != '\0')
@@ -911,8 +912,6 @@ dir_entry FS::find_dir_entry(std::string filepath)
 	disk.read(ROOT_BLOCK, block);
 	dir_entry* dirblock = (dir_entry*)(block);
 
-	std::string fullpath("");
-
 	// if (filepath.back() != '/')
 	// 	filepath.append("/");
 
@@ -1061,4 +1060,44 @@ int FS::updateSize(uint32_t size, std::string updateFrom)
 
 	disk.write(ROOT_BLOCK, block);
 	return 0;
+}
+
+//Retrives the entry of a given filelpath. If the entry is not found, nullptr is returned.
+dir_entry* FS::get_entry(std::string filepath)
+{
+	auto pathvec = split_path(filepath);
+	if (true)
+	{
+		//Search from root directory.
+		uint8_t block[BLOCK_SIZE];
+		disk.read(ROOT_BLOCK, block);
+
+	}
+	else
+	{
+		//Search from current path.
+	}
+	return nullptr;
+}
+
+/*
+Takes a path and returns a vector of strings where every string
+represents a directory or a file. The strings are stored in the vector
+with the same order as the the filepath.
+*/
+std::vector<std::string> FS::split_path(std::string filepath)
+{
+	std::vector<std::string> results;
+	size_t cut;
+	if (filepath.front() == '/')
+		results.push_back("/");
+	while ((cut = filepath.find_first_of('/')) != filepath.npos)
+	{
+		if (cut > 0)
+			results.push_back(filepath.substr(0, cut));
+		filepath = filepath.substr(cut + 1);
+	}
+	if (filepath.length() > 0)
+		results.push_back(filepath);
+	return results;
 }

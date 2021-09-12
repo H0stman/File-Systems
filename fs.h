@@ -37,7 +37,7 @@ struct dir_entry
 
 class FS
 {
-private:
+    private:
     Disk disk;
     // size of a FAT entry is 2 bytes
     int16_t fat[BLOCK_SIZE / 2];
@@ -47,9 +47,10 @@ private:
     std::vector<int> find_multiple_empty(int numBlocks);
     dir_entry find_dir_entry(const std::string filepath);
     int updateSize(uint32_t size, std::string updateFrom);
-
+    dir_entry* get_entry(std::string filepath);
+    std::vector<std::string> split_path(std::string filepath);
     std::string path;
-public:
+    public:
     FS();
     ~FS();
     // formats the disk, i.e., creates an empty file system
