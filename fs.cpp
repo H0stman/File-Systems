@@ -17,21 +17,6 @@ int FS::format()
 {
 	std::cout << "FS::format()\n";
 
-	//Set the whole disk to 0.
-	uint8_t zeroblob[BLOCK_SIZE] = { 0 };
-	for (unsigned int i = 0; i < disk.get_no_blocks(); i++)
-		disk.write(i, zeroblob);
-
-	//Configure root direcotry block
-	std::string name("/");
-	uint8_t blob[BLOCK_SIZE] = { 0 };
-	dir_entry* root = (dir_entry*)blob;
-	root->access_rights = READ | WRITE | EXECUTE;
-	name.copy(root->file_name, name.size());
-	root->first_blk = ROOT_BLOCK;
-	root->size = 0;
-	root->type = TYPE_DIR;
-
 	//Mark root dir and FAT as EOF in the FAT
 	fat[0] = FAT_EOF;
 	fat[1] = FAT_EOF;
@@ -41,7 +26,6 @@ int FS::format()
 		fat[i] = FAT_FREE;
 
 	//Write blocks to disk
-	disk.write(ROOT_BLOCK, (uint8_t*)root);
 	disk.write(FAT_BLOCK, (uint8_t*)fat);
 
 	path = "/";
