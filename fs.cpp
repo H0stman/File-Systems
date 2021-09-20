@@ -1510,16 +1510,30 @@ int FS::updateSize(uint32_t size, std::string updateFrom)
 dir_entry* FS::get_entry(std::string filepath)
 {
 	auto pathvec = split_path(filepath);
-	if (true)
-	{
-		//Search from root directory.
-		uint8_t block[BLOCK_SIZE];
-		disk.read(ROOT_BLOCK, block);
+	auto absvec = split_path(path);
+	if (pathvec[0] != "/")
+		pathvec.insert(pathvec.begin(), absvec.begin(), absvec.end());
 
-	}
-	else
+	//Search from root directory.
+	uint8_t block[BLOCK_SIZE];
+	disk.read(ROOT_BLOCK, block);
+	for (auto&& s : pathvec)
 	{
-		//Search from current path.
+		if (s == "/") continue;
+		for (dir_entry* it = (dir_entry*)block; it != nullptr; it++)
+		{
+			if (!s.compare(it->file_name))
+			{
+				if (!s.compare(pathvec.back()))
+				{
+					dir_entry* result = (dir_entry*)malloc(sizeof(dir_entry));
+					*result = *it;
+					return result;
+				}
+				else
+					disk.read(it->first_blk, block);
+			}
+		}
 	}
 	return nullptr;
 }
