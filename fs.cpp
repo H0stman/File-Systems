@@ -567,7 +567,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		disk.read(sourceblockNr, buff);
 
 		//Find the dir.
-		size_t k = 1;
+		k = 1;
 		while (dirblock[k].file_name != oldName && k < BLOCK_SIZE / sizeof(dir_entry))
 			k++;
 
@@ -706,7 +706,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					disk.read(sourceblockNr, buff);
 
 					//Find the dir.
-					size_t k = 1;
+					k = 1;
 					while (dirblock[k].file_name != sourceDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
 						k++;
 
@@ -801,7 +801,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				disk.read(sourceblockNr, buff);
 
 				//Find the dir.
-				size_t k = 1;
+				k = 1;
 				while (dirblock[k].file_name != sourceDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
 					k++;
 
@@ -937,7 +937,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			disk.read(sourceblockNr, buff);
 
 			//Find the dir.
-			size_t k = 1;
+			k = 1;
 			while (dirblock[k].file_name != oldName && k < BLOCK_SIZE / sizeof(dir_entry))
 				k++;
 
