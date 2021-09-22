@@ -217,48 +217,52 @@ int FS::ls()
 	dir_entry* file_entry = nullptr;
 	file_entry = dirblock; //Set the first file entry to be the start of the directory block.
 
-	//Check the access rights and construct the string.
-	std::string accessRights = "";
-	if (file_entry->access_rights & READ)
-		accessRights.append("r");
-	else
-		accessRights.append("-");
-
-	if (file_entry->access_rights & WRITE)
-		accessRights.append("w");
-	else
-		accessRights.append("-");
-
-	if (file_entry->access_rights & EXECUTE)
-		accessRights.append("x");
-	else
-		accessRights.append("-");
-
-	//Write out the current blocks content.
-	std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
-
-	for (long unsigned int i = 1; i < BLOCK_SIZE / sizeof(dir_entry); i++)
+	if (*file_entry->file_name != '/')
 	{
-		accessRights = "";
-		file_entry++;
-		if (file_entry->file_name[0] != '\0')
+
+		//Check the access rights and construct the string.
+		std::string accessRights = "";
+		if (file_entry->access_rights & READ)
+			accessRights.append("r");
+		else
+			accessRights.append("-");
+
+		if (file_entry->access_rights & WRITE)
+			accessRights.append("w");
+		else
+			accessRights.append("-");
+
+		if (file_entry->access_rights & EXECUTE)
+			accessRights.append("x");
+		else
+			accessRights.append("-");
+
+		//Write out the current blocks content.
+		std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
+
+		for (long unsigned int i = 1; i < BLOCK_SIZE / sizeof(dir_entry); i++)
 		{
-			if (file_entry->access_rights & READ)
-				accessRights.append("r");
-			else
-				accessRights.append("-");
+			accessRights = "";
+			file_entry++;
+			if (file_entry->file_name[0] != '\0')
+			{
+				if (file_entry->access_rights & READ)
+					accessRights.append("r");
+				else
+					accessRights.append("-");
 
-			if (file_entry->access_rights & WRITE)
-				accessRights.append("w");
-			else
-				accessRights.append("-");
+				if (file_entry->access_rights & WRITE)
+					accessRights.append("w");
+				else
+					accessRights.append("-");
 
-			if (file_entry->access_rights & EXECUTE)
-				accessRights.append("x");
-			else
-				accessRights.append("-");
+				if (file_entry->access_rights & EXECUTE)
+					accessRights.append("x");
+				else
+					accessRights.append("-");
 
-			std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
+				std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
+			}
 		}
 	}
 	return 0;
@@ -659,8 +663,8 @@ int FS::mkdir(std::string dirpath)
 {
 	std::cout << "FS::mkdir(" << dirpath << ")\n";
 
-	dir_entry currentDir = find_dir_entry(dirpath);
-	if (currentDir.file_name[0] != '\0')
+	dir_entry* currentDir = get_entry(dirpath);
+	if (currentDir)
 	{
 		std::cerr << "Error! That name already exists!" << std::endl;
 		return -1;
@@ -675,7 +679,7 @@ int FS::mkdir(std::string dirpath)
 	temppath = dirpath.substr(dirpath.find_last_of('/') + 1, dirpath.length() - 1);
 	dirpath.erase(dirpath.find_last_of('/'), dirpath.length() - 1);
 
-	currentDir = find_dir_entry(dirpath);
+	currentDir = get_entry(dirpath);
 	//New directory
 	dir_entry newDir;
 	temppath.copy(newDir.file_name, 56);
@@ -690,7 +694,7 @@ int FS::mkdir(std::string dirpath)
 	dir_entry returnDir;
 	returnDir.file_name[0] = '.';
 	returnDir.file_name[1] = '.';
-	returnDir.first_blk = currentDir.first_blk; // kanske fel.
+	returnDir.first_blk = currentDir->first_blk; // kanske fel.
 	returnDir.size = 0;
 	returnDir.type = 1;
 	returnDir.access_rights = READ | WRITE | EXECUTE;
@@ -698,7 +702,7 @@ int FS::mkdir(std::string dirpath)
 	//Read current block.
 	uint8_t buff[BLOCK_SIZE] = { 0 };
 	dir_entry* currentblock = (dir_entry*)(buff);
-	disk.read(currentDir.first_blk, (uint8_t*)currentblock);
+	disk.read(currentDir->first_blk, (uint8_t*)currentblock);
 
 	//Find an empty spot for the new directory.
 	unsigned int k = 1;
@@ -716,7 +720,7 @@ int FS::mkdir(std::string dirpath)
 		currentblock[k] = newDir;
 
 	//Write back the current block.
-	disk.write(currentDir.first_blk, (uint8_t*)currentblock);
+	disk.write(currentDir->first_blk, (uint8_t*)currentblock);
 
 	//Read new block, that is for the new directory entry.
 	uint8_t buff2[BLOCK_SIZE] = { 0 };
@@ -1057,11 +1061,16 @@ dir_entry* FS::get_entry(std::string filepath)
 	//Search from root directory.
 	uint8_t block[BLOCK_SIZE];
 	disk.read(ROOT_BLOCK, block);
+	dir_entry* it = (dir_entry*)block;
 	for (auto&& s : pathvec)
 	{
-		if (s == "/") continue;
-		for (dir_entry* it = (dir_entry*)block; it != nullptr; it++)
+		for (; it->file_name[0] != '\0'; it++)
 		{
+			if (s == "/")
+			{
+				++it;
+				break;
+			}
 			if (!s.compare(it->file_name))
 			{
 				if (!s.compare(pathvec.back()))
@@ -1071,7 +1080,10 @@ dir_entry* FS::get_entry(std::string filepath)
 					return result;
 				}
 				else
+				{
 					disk.read(it->first_blk, block);
+					it = (dir_entry*)block;
+				}
 			}
 		}
 	}
