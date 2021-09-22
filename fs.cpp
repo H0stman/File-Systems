@@ -42,7 +42,7 @@ int FS::create(std::string filepath)
 	auto exist = get_entry(filepath);
 
 	//Check if the filepath entered already exists.
-	if (find_dir_entry(filepath).file_name[0] != '\0')
+	if (exist)
 	{
 		std::cerr << "Error! That file or directory already exists." << std::endl;
 		return -1;
@@ -213,6 +213,11 @@ int FS::ls()
 	uint8_t buff[BLOCK_SIZE] = { 0 };
 	dir_entry* dirblock = (dir_entry*)buff;
 	dir_entry currentDir = find_dir_entry(this->path);
+	if (!(currentDir.access_rights & EXECUTE))
+	{
+		std::cerr << "Error! You do not have access rights to execute this folder. Therefore you can not list its files." << std::endl;
+		return -1;
+	}
 	disk.read(currentDir.first_blk, (uint8_t*)dirblock);
 	dir_entry* file_entry = nullptr;
 	file_entry = dirblock; //Set the first file entry to be the start of the directory block.
@@ -287,6 +292,12 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	if (find_dir_entry(destfilepath).file_name[0] != '\0')
 	{
 		std::cerr << "Error! Destination already exists." << std::endl;
+		return -1;
+	}
+
+	if (!(sourceDir.access_rights & WRITE))
+	{
+		std::cerr << "Error! You do not have access rights to write to that file. Therefore you can not copy it." << std::endl;
 		return -1;
 	}
 
@@ -484,7 +495,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		}
 
 		//Create a buffer
-		buff[BLOCK_SIZE] = { 0 };
+		memset(buff, 0, 4096);
 		dirblock = (dir_entry*)buff;
 
 		//Read the block that it is to be moved to.
@@ -506,8 +517,9 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		{
 			//Set the sourceDir name to the appropriate name.
 			std::vector<std::string> split_destpath = split_path(destpath);
-			std::string newName = split_destpath.end();
-			sourceDir->file_name = newName;
+			std::string newName = split_destpath[split_destpath.size() - 1];
+			memset(sourceDir->file_name, '\0', 56);
+			newName.copy(sourceDir->file_name, newName.size());
 			dirblock[k] = *sourceDir;
 		}
 
@@ -537,7 +549,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		uint16_t sourceblockNr;
 		if (shortsource.size() == 1)
 		{
-			sourceblockNr = ROOT_BLOCK
+			sourceblockNr = ROOT_BLOCK;
 		}
 		//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
 		else
@@ -548,7 +560,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		}
 
 		//Create a buffer
-		buff = { 0 };
+		memset(buff, 0, 4096);
 		dirblock = (dir_entry*)buff;
 
 		//Read the rootblock.
@@ -591,7 +603,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			//If it is occupied by a file we overwrite it. UPDATE FAT TABLE.
 			//If it is occupied by a folder we throw an error.
 			std::vector<std::string> split_sourcepath = split_path(sourcepath);
-			std::string name = split_sourcepath.end();
+			std::string name = split_sourcepath[split_sourcepath.size() - 1];
 			std::string longpath = destpath + '/' + name;
 			dir_entry* replaced_dir = get_entry(longpath);
 			//If it exists
@@ -625,7 +637,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 					//Add the dir to the destination.
 					//Create a buffer
-					buff[BLOCK_SIZE] = { 0 };
+					memset(buff, 0, 4096);
 					dirblock = (dir_entry*)buff;
 
 					uint16_t destblockNr = destDir->first_blk;
@@ -676,7 +688,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					uint16_t sourceblockNr;
 					if (shortsource.size() == 1)
 					{
-						sourceblockNr = ROOT_BLOCK
+						sourceblockNr = ROOT_BLOCK;
 					}
 					//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
 					else
@@ -687,7 +699,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					}
 
 					//Create a buffer
-					buff = { 0 };
+					memset(buff, 0, 4096);
 					dirblock = (dir_entry*)buff;
 
 					//Read the rootblock.
@@ -722,7 +734,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			{
 				//Add the dir to the destination.
 				//Create a buffer
-				buff[BLOCK_SIZE] = { 0 };
+				memset(buff, 0, 4096);
 				dirblock = (dir_entry*)buff;
 
 				uint16_t destblockNr = destDir->first_blk;
@@ -771,7 +783,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				uint16_t sourceblockNr;
 				if (shortsource.size() == 1)
 				{
-					sourceblockNr = ROOT_BLOCK
+					sourceblockNr = ROOT_BLOCK;
 				}
 				//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
 				else
@@ -782,7 +794,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				}
 
 				//Create a buffer
-				buff = { 0 };
+				memset(buff, 0, 4096);
 				dirblock = (dir_entry*)buff;
 
 				//Read the rootblock.
@@ -855,7 +867,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 			//Add the dir to the destination.
 			//Create a buffer
-			buff[BLOCK_SIZE] = { 0 };
+			memset(buff, 0, 4096);
 			dirblock = (dir_entry*)buff;
 
 			uint16_t destblockNr = destFolder->first_blk;
@@ -869,7 +881,8 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				k++;
 
 			//Replace the info in that directory with the source dir information, also rename the file.
-			sourceDir->file_name = destDir->file_name;
+			memset(sourceDir->file_name, '\0', 56);
+			strncpy(sourceDir->file_name, destDir->file_name, 56);
 			dirblock[k] = *sourceDir;
 
 			//Only update the sizes if its not in rootblock.
@@ -906,7 +919,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			uint16_t sourceblockNr;
 			if (shortsource.size() == 1)
 			{
-				sourceblockNr = ROOT_BLOCK
+				sourceblockNr = ROOT_BLOCK;
 			}
 			//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
 			else
@@ -917,7 +930,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			}
 
 			//Create a buffer
-			buff = { 0 };
+			memset(buff, 0, 4096);
 			dirblock = (dir_entry*)buff;
 
 			//Read the block.
@@ -1030,6 +1043,13 @@ int FS::append(std::string filepath1, std::string filepath2)
 		std::cerr << "Path not valid." << std::endl;
 		return -1;
 	}
+
+	if (!(entry2.access_rights & WRITE))
+	{
+		std::cerr << "Error! You do not have access rights to write to that file. Therefore you can not copy it." << std::endl;
+		return -1;
+	}
+	
 	uint8_t file1[BLOCK_SIZE];
 	size_t binlastblock2 = entry2.size % BLOCK_SIZE;
 
