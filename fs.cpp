@@ -42,7 +42,7 @@ int FS::create(std::string filepath)
 	auto exist = get_entry(filepath);
 
 	//Check if the filepath entered already exists.
-	if (find_dir_entry(filepath).file_name[0] != '\0')
+	if (exist)
 	{
 		std::cerr << "Error! That file or directory already exists." << std::endl;
 		return -1;
@@ -213,6 +213,11 @@ int FS::ls()
 	uint8_t buff[BLOCK_SIZE] = { 0 };
 	dir_entry* dirblock = (dir_entry*)buff;
 	dir_entry currentDir = find_dir_entry(this->path);
+	if (!(currentDir.access_rights & EXECUTE))
+	{
+		std::cerr << "Error! You do not have access rights to execute this folder. Therefore you can not list its files." << std::endl;
+		return -1;
+	}
 	disk.read(currentDir.first_blk, (uint8_t*)dirblock);
 	dir_entry* file_entry = nullptr;
 	file_entry = dirblock; //Set the first file entry to be the start of the directory block.
@@ -291,6 +296,12 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	if (find_dir_entry(destfilepath).file_name[0] != '\0')
 	{
 		std::cerr << "Error! Destination already exists." << std::endl;
+		return -1;
+	}
+
+	if (!(sourceDir.access_rights & WRITE))
+	{
+		std::cerr << "Error! You do not have access rights to write to that file. Therefore you can not copy it." << std::endl;
 		return -1;
 	}
 
@@ -384,7 +395,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 
 	//Find an empty spot for the new directory.
 	size_t k = 1;
-	while (dirblock[k].file_name[0] != '\0' && k < BLOCK_SIZE / sizeof(dir_entry)) //Fel antal
+	while (dirblock[k].file_name[0] != '\0' && k < BLOCK_SIZE / sizeof(dir_entry))
 		k++;
 
 	//If there is no empty spot.
@@ -417,81 +428,542 @@ int FS::mv(std::string sourcepath, std::string destpath)
 {
 	std::cout << "FS::mv(" << sourcepath << "," << destpath << ")\n";
 
-	dir_entry currentDir;
-	destpath = path + destpath;
-	std::string tempPath = destpath;
-	while (destpath.back() != '/')
-		destpath.pop_back();
+	//Create a buffer, used when reading blocks.
+	uint8_t buff[BLOCK_SIZE] = { 0 };
+	dir_entry* dirblock = (dir_entry*)buff;
 
-	if (destpath.size() != 1)
-		destpath.pop_back();
-
-	dir_entry destDir = find_dir_entry(destpath);
-
-	currentDir = find_dir_entry(sourcepath);
-	if (currentDir.file_name[0] == '\0')
+	//SOURCE ---------------------------------------------------------------
+	//Check if the path is relative or absolute.
+	//If front is not /, then the path is relative -> Make it absolute.
+	if (sourcepath.front() != '/')
+		sourcepath = path + sourcepath;
+	
+	dir_entry* sourceDir = get_entry(sourcepath);
+	//If it is a directory or doesnt exist at all.
+	if (sourceDir->type == TYPE_DIR || !sourceDir)
 	{
 		std::cerr << "Error! The source file does not exist!" << std::endl;
 		return -1;
 	}
-	if (currentDir.type == 1)
+	//-----------------------------------------------------------------------
+
+	//DEST ------------------------------------------------------------------
+	if (destpath.size() == 0 || sourcepath == destpath)
 	{
-		std::cerr << "Error! The source is a directory, not a file." << std::endl;
+		std::cerr << "Error! A valid path has to be entered. Can not move a file to the same position it is already in, or rename a file to the same name it already has." << std::endl;
 		return -1;
 	}
+	//Check if the path is relative or absolute.
+	//If front is not /, then the path is relative -> Make it absolute.
+	if (destpath.front() != '/')
+		destpath = path + destpath;
 
-	if (destDir.type == 1) //Move if dest is a directory.
+	dir_entry* destDir = get_entry(destpath);
+	//If the dir_entry doesn't exist check the same path except the last file/folder.
+	if (!destDir)
 	{
-		dir_entry tempDir = find_dir_entry(tempPath);
-		if (tempDir.file_name[0] != '\0')
-			rm(tempPath);
-		cp(sourcepath, tempPath);
-		rm(sourcepath);
+		//Save the old filename of source. We will need it when removing the source dir at the end.
+		std::string oldName = sourceDir->file_name;
+
+		//Get the shortdest path (remove the last file/folder from the path.)
+		std::string shortdest = destpath;
+		//Remove the last dir/file.
+		while (shortdest.back() != '/')
+		{
+			shortdest.pop_back();
+		}
+		//Remove the slash if it is not root.
+		if (shortdest.size() != 1)
+			shortdest.pop_back();
+
+		//Check so that the "smaller" destination exists and that it is a folder. We can not move something into a file.
+		destDir = get_entry(shortdest);
+		if (destDir->type == TYPE_FILE || !destDir)
+		{
+			std::cerr << "Error! The destination path does not exist!" << std::endl;
+			return -1;
+		}
+
+		uint16_t destblockNr;
+		//If it is the root block slash then move the file to the rootblock.
+		if (shortdest.size() == 1)
+		{
+			destblockNr = ROOT_BLOCK;
+		}
+
+		//If it was not the root slash remove it and we now know that the source is to be moved into a destination that is not "/".
+		else {
+			//Here we know that destDir is pointing at a folder that is not "/", and that the source is to be moved into
+			//this folder.
+			destblockNr = destDir->first_blk;
+		}
+
+		//Create a buffer
+		memset(buff, 0, 4096);
+		dirblock = (dir_entry*)buff;
+
+		//Read the block that it is to be moved to.
+		disk.read(destblockNr, buff);
+
+		//Find an empty spot for the dir.
+		size_t k = 1;
+		while (dirblock[k].file_name[0] != '\0' && k < BLOCK_SIZE / sizeof(dir_entry))
+			k++;
+
+		//If there is no empty spot.
+		if (dirblock[k].file_name[0] != '\0')
+		{
+			std::cerr << "ERROR! No more space for dir_entries in the root block." << std::endl;
+			return -1;
+		}
+		//Put the source directory in the empty spot, after changing its name.
+		else
+		{
+			//Set the sourceDir name to the appropriate name.
+			std::vector<std::string> split_destpath = split_path(destpath);
+			std::string newName = split_destpath[split_destpath.size() - 1];
+			memset(sourceDir->file_name, '\0', 56);
+			newName.copy(sourceDir->file_name, newName.size());
+			dirblock[k] = *sourceDir;
+		}
+
+		//We only need to update the size when not adding to root..
+		if (destblockNr != ROOT_BLOCK)
+		{
+			if (updateSize(sourceDir->size, shortdest) == -1)
+			{
+				std::cerr << "Error! Could not update the sizes." << std::endl;
+				return -1;
+			}
+		}
+		//Write it back to disk.
+		disk.write(destblockNr, (uint8_t*)buff);
+
+
+		//We now also need to remove the dir_entry from the source.
+		//Get the dir of the folder the sourcefile is in.
+		std::string shortsource = sourcepath;
+		//Remove the filename.
+		while (shortsource.back() != '/')
+		{
+			shortsource.pop_back();
+		}
+
+		//If the sourcefile is in root.
+		uint16_t sourceblockNr;
+		if (shortsource.size() == 1)
+		{
+			sourceblockNr = ROOT_BLOCK;
+		}
+		//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
+		else
+		{
+			//Remove the slash at the front.
+			shortsource.pop_back();
+			sourceblockNr = get_entry(shortsource)->first_blk;
+		}
+
+		//Create a buffer
+		memset(buff, 0, 4096);
+		dirblock = (dir_entry*)buff;
+
+		//Read the rootblock.
+		disk.read(sourceblockNr, buff);
+
+		//Find the dir.
+		k = 1;
+		while (dirblock[k].file_name != oldName && k < BLOCK_SIZE / sizeof(dir_entry))
+			k++;
+
+		//Make the dir_entry 0.
+		dirblock[k] = dir_entry(); //?????
+
+		//We do not need to update the size of anything in the tree when removing something from root.
+		//Only update size if it was not in the rootblock.
+		if (sourceblockNr != ROOT_BLOCK)
+		{
+			if (updateSize(-sourceDir->size, shortsource) == -1)
+			{
+				std::cerr << "Error! Could not update the sizes." << std::endl;
+				return -1;
+			}
+		}
+
+		//Write it back to disk after removing the old dir_entry.
+		disk.write(sourceblockNr, (uint8_t*)buff);
 
 		return 0;
 	}
-	else if ((destDir.file_name[0] != '\0' && destDir.type == 0)) //OR if the name is taken and it is a file
+
+	//If the dir_Entry exists it can be either:
+	//1. A folder that the file is to be moved to.
+	//2. A file that is to be "overwritten". UPDATE FAT TABLE.
+	else
 	{
-		rm(destpath);
-		cp(sourcepath, destpath);
-		rm(sourcepath);
+		//It is a folder.
+		if (destDir->type == TYPE_DIR)
+		{
+			//If it is a folder we now need to check if the name of the source is occupied in the folder.
+			//If it is occupied by a file we overwrite it. UPDATE FAT TABLE.
+			//If it is occupied by a folder we throw an error.
+			std::vector<std::string> split_sourcepath = split_path(sourcepath);
+			std::string name = split_sourcepath[split_sourcepath.size() - 1];
+			std::string longpath = destpath + '/' + name;
+			dir_entry* replaced_dir = get_entry(longpath);
+			//If it exists
+			if (replaced_dir)
+			{
+				//Check if it is a folder or file.
+				//A folder cant be overwritten.
+				if (replaced_dir->type == TYPE_DIR)
+				{
+					std::cerr << "Error! The filename is taken by a folder in the destination folder." << std::endl;
+					return -1;
+				}
+				//Overwrite the file. UPDATE FAT TABLE.
+				else
+				{
+					//First we update the FAT table to remove the destination file that we are to "overwrite".
+					//Update fat table.
+					int save = 0;
+					for (int i = fat[replaced_dir->first_blk];; i = save)
+					{
+						if (i == EOF)
+						{
+							fat[save] = EOF;
+							break;
+						}
+						save = fat[i];
+						fat[i] = FAT_FREE;
+					}
+					//Remove first fat entry??? in fat[replaced_dir->first_blk]
+					fat[replaced_dir->first_blk] = FAT_FREE;
 
-		return 0;
+					//Add the dir to the destination.
+					//Create a buffer
+					memset(buff, 0, 4096);
+					dirblock = (dir_entry*)buff;
+
+					uint16_t destblockNr = destDir->first_blk;
+
+					//Read the block.
+					disk.read(destblockNr, buff);
+
+					//Find the dir that is too be replaced.
+					size_t k = 1;
+					while (dirblock[k].file_name != replaced_dir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+						k++;
+
+					//Replace the info in that directory with the source dir information.
+					//We already know the name is correct.
+					dirblock[k] = *sourceDir;
+
+					//Only update the sizes if its not in rootblock.
+					if (destblockNr != ROOT_BLOCK)
+					{
+						//Update size by first subtracting the replaced dir.
+						if (updateSize(-replaced_dir->size, destpath) == -1)
+						{
+							std::cerr << "Error! Could not update the sizes." << std::endl;
+							return -1;
+						}
+
+						//Then we update the size again to account for the newly added sourcefile in the destination.
+						if (updateSize(sourceDir->size, destpath) == -1)
+						{
+							std::cerr << "Error! Could not update the sizes." << std::endl;
+							return -1;
+						}
+					}
+					
+					//Write it back to disk.
+					disk.write(destblockNr, (uint8_t*)buff);
+
+					//We now also need to remove the dir_entry from the source.
+					//Get the dir of the folder the sourcefile is in.
+					std::string shortsource = sourcepath;
+					//Remove the filename.
+					while (shortsource.back() != '/')
+					{
+						shortsource.pop_back();
+					}
+
+					//If the sourcefile is in root.
+					uint16_t sourceblockNr;
+					if (shortsource.size() == 1)
+					{
+						sourceblockNr = ROOT_BLOCK;
+					}
+					//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
+					else
+					{
+						//Remove the slash at the front.
+						shortsource.pop_back();
+						sourceblockNr = get_entry(shortsource)->first_blk;
+					}
+
+					//Create a buffer
+					memset(buff, 0, 4096);
+					dirblock = (dir_entry*)buff;
+
+					//Read the rootblock.
+					disk.read(sourceblockNr, buff);
+
+					//Find the dir.
+					k = 1;
+					while (dirblock[k].file_name != sourceDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+						k++;
+
+					//Make the dir_entry 0.
+					dirblock[k] = dir_entry(); //?????
+
+					//Only update size if it was not in the rootblock.
+					if (sourceblockNr != ROOT_BLOCK)
+					{
+						if (updateSize(-sourceDir->size, shortsource) == -1)
+						{
+							std::cerr << "Error! Could not update the sizes." << std::endl;
+							return -1;
+						}
+					}
+
+					//Write it back to disk after removing the old dir_entry.
+					disk.write(sourceblockNr, (uint8_t*)buff);
+
+					return 0;
+				}
+			}
+			//If it does not exist we just move the file here.
+			else
+			{
+				//Add the dir to the destination.
+				//Create a buffer
+				memset(buff, 0, 4096);
+				dirblock = (dir_entry*)buff;
+
+				uint16_t destblockNr = destDir->first_blk;
+
+				//Read the block.
+				disk.read(destblockNr, buff);
+
+				//Find an empty spot for the dir.
+				size_t k = 1;
+				while (dirblock[k].file_name[0] != '\0' && k < BLOCK_SIZE / sizeof(dir_entry))
+					k++;
+
+				//If there is no empty spot.
+				if (dirblock[k].file_name[0] != '\0')
+				{
+					std::cerr << "ERROR! No more space for dir_entries in the block." << std::endl;
+					return -1;
+				}
+				//Put the source directory in the empty spot, after changing its name.
+				dirblock[k] = *sourceDir;
+
+				//Only update the sizes if its not in rootblock.
+				if (destblockNr != ROOT_BLOCK)
+				{
+					//We update the size to account for the newly added sourcefile in the destination.
+					if (updateSize(sourceDir->size, destpath) == -1)
+					{
+						std::cerr << "Error! Could not update the sizes." << std::endl;
+						return -1;
+					}
+				}
+
+				//Write it back to disk.
+				disk.write(destblockNr, (uint8_t*)buff);
+
+				//We now also need to remove the dir_entry from the source.
+				//Get the dir of the folder the sourcefile is in.
+				std::string shortsource = sourcepath;
+				//Remove the filename.
+				while (shortsource.back() != '/')
+				{
+					shortsource.pop_back();
+				}
+
+				//If the sourcefile is in root.
+				uint16_t sourceblockNr;
+				if (shortsource.size() == 1)
+				{
+					sourceblockNr = ROOT_BLOCK;
+				}
+				//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
+				else
+				{
+					//Remove the slash at the front.
+					shortsource.pop_back();
+					sourceblockNr = get_entry(shortsource)->first_blk;
+				}
+
+				//Create a buffer
+				memset(buff, 0, 4096);
+				dirblock = (dir_entry*)buff;
+
+				//Read the rootblock.
+				disk.read(sourceblockNr, buff);
+
+				//Find the dir.
+				k = 1;
+				while (dirblock[k].file_name != sourceDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+					k++;
+
+				//Make the dir_entry 0.
+				dirblock[k] = dir_entry(); //?????
+
+				//Only update size if it was not in the rootblock.
+				if (sourceblockNr != ROOT_BLOCK)
+				{
+					if (updateSize(-sourceDir->size, shortsource) == -1)
+					{
+						std::cerr << "Error! Could not update the sizes." << std::endl;
+						return -1;
+					}
+				}
+
+				//Write it back to disk after removing the old dir_entry.
+				disk.write(sourceblockNr, (uint8_t*)buff);
+
+				return 0;
+			}
+		}
+		//It is a file, overwrite it. UPDATE FAT TABLE.
+		else 
+		{
+			//Save the oldname of the source, to be able to find the dir later.
+			std::string oldName = sourceDir->file_name;
+
+			//Get the shortdest path (remove the last filename from the path.)
+			std::string shortdest = destpath;
+			//Remove the last dir/file.
+			while (shortdest.back() != '/')
+			{
+				shortdest.pop_back();
+			}
+			//Remove the slash if it is not root.
+			if (shortdest.size() != 1)
+				shortdest.pop_back();
+
+			//Check so that the "smaller" destination exists and that it is a folder. We can not move something into a file.
+			dir_entry* destFolder = get_entry(shortdest);
+			if (destFolder->type == TYPE_FILE || !destFolder)
+			{
+				std::cerr << "Error! The destination path does not exist!" << std::endl;
+				return -1;
+			}
+
+			//First we update the FAT table to remove the destination file that we are to "overwrite".
+			//Update fat table.
+			int save = 0;
+			for (int i = fat[destDir->first_blk];; i = save)
+			{
+				if (i == EOF)
+				{
+					fat[save] = EOF;
+					break;
+				}
+				save = fat[i];
+				fat[i] = FAT_FREE;
+			}
+			//Remove first fat entry??? in fat[replaced_dir->first_blk]
+			fat[destDir->first_blk] = FAT_FREE;
+
+			//Add the dir to the destination.
+			//Create a buffer
+			memset(buff, 0, 4096);
+			dirblock = (dir_entry*)buff;
+
+			uint16_t destblockNr = destFolder->first_blk;
+
+			//Read the block.
+			disk.read(destblockNr, buff);
+
+			//Find the dir that is too be replaced.
+			size_t k = 1;
+			while (dirblock[k].file_name != destDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+				k++;
+
+			//Replace the info in that directory with the source dir information, also rename the file.
+			memset(sourceDir->file_name, '\0', 56);
+			strncpy(sourceDir->file_name, destDir->file_name, 56);
+			dirblock[k] = *sourceDir;
+
+			//Only update the sizes if its not in rootblock.
+			if (destblockNr != ROOT_BLOCK)
+			{
+				//Update size by first subtracting the replaced dir.
+				if (updateSize(-destDir->size, destpath) == -1)
+				{
+					std::cerr << "Error! Could not update the sizes." << std::endl;
+					return -1;
+				}
+
+				//Then we update the size again to account for the newly added sourcefile in the destination.
+				if (updateSize(sourceDir->size, destpath) == -1)
+				{
+					std::cerr << "Error! Could not update the sizes." << std::endl;
+					return -1;
+				}
+			}
+
+			//Write it back to disk.
+			disk.write(destblockNr, (uint8_t*)buff);
+
+			//We now also need to remove the dir_entry from the source.
+			//Get the dir of the folder the sourcefile is in.
+			std::string shortsource = sourcepath;
+			//Remove the filename.
+			while (shortsource.back() != '/')
+			{
+				shortsource.pop_back();
+			}
+
+			//If the sourcefile is in root.
+			uint16_t sourceblockNr;
+			if (shortsource.size() == 1)
+			{
+				sourceblockNr = ROOT_BLOCK;
+			}
+			//sourcefile is not in root. Find the dir of the folder and what block the dir is pointing to.
+			else
+			{
+				//Remove the slash at the front.
+				shortsource.pop_back();
+				sourceblockNr = get_entry(shortsource)->first_blk;
+			}
+
+			//Create a buffer
+			memset(buff, 0, 4096);
+			dirblock = (dir_entry*)buff;
+
+			//Read the block.
+			disk.read(sourceblockNr, buff);
+
+			//Find the dir.
+			k = 1;
+			while (dirblock[k].file_name != oldName && k < BLOCK_SIZE / sizeof(dir_entry))
+				k++;
+
+			//Make the dir_entry 0.
+			dirblock[k] = dir_entry(); //?????
+
+			//Only update size if it was not in the rootblock.
+			if (sourceblockNr != ROOT_BLOCK)
+			{
+				if (updateSize(-sourceDir->size, shortsource) == -1)
+				{
+					std::cerr << "Error! Could not update the sizes." << std::endl;
+					return -1;
+				}
+			}
+
+			//Write it back to disk after removing the old dir_entry.
+			disk.write(sourceblockNr, (uint8_t*)buff);
+
+			return 0;
+		}
 	}
-
-	//If filename is too long
-	if (destpath.length() > 56)
-	{
-		std::cerr << "Error! New filename is too long!" << std::endl;
-		return -1;
-	}
-
-	//Read current block.
-	uint8_t buff[BLOCK_SIZE] = { 0 };
-	dir_entry* dirblock = (dir_entry*)buff;
-
-	//If the path is relative, make it absolute.
-	if (sourcepath[0] != '/')
-		sourcepath = path + sourcepath;
-
-	//Get the name of the file, if what was entered was a path.
-	std::string temppath = sourcepath.substr(sourcepath.find_last_of('/') + 1, sourcepath.length() - 1);
-	sourcepath.erase(sourcepath.find_last_of('/'), sourcepath.length() - 1);
-	currentDir = find_dir_entry(sourcepath);
-	disk.read(currentDir.first_blk, buff);
-
-	//Find the spot where the dir is.
-	int i = 0;
-	while (temppath.compare(dirblock->file_name) && i < std::floor(BLOCK_SIZE / sizeof(dir_entry)))
-	{
-		i++;
-		dirblock++;
-	}
-	//Change the dir name and write it back to disk.
-	memset(dirblock->file_name, 0, 56);
-	destpath.copy(dirblock->file_name, 56);
-	disk.write(currentDir.first_blk, (uint8_t*)buff);
-	return 0;
 }
 
 // rm <filepath> removes / deletes the file <filepath>
@@ -530,6 +1002,7 @@ int FS::rm(std::string filepath)
 		}
 	}
 
+	//Update fat table.
 	int save = 0;
 	for (int i = fat[entry->first_blk];; i = save)
 	{
@@ -540,9 +1013,9 @@ int FS::rm(std::string filepath)
 		}
 		save = fat[i];
 		fat[i] = FAT_FREE;
-		if (i == EOF)
-			break;
 	}
+	//Remove first fat entry??? in fat[entry->first_blk]
+	fat[entry->first_blk] = FAT_FREE;
 
 	entry->access_rights = 0u;
 	for (size_t i = 0; i < 56; i++)
@@ -574,6 +1047,13 @@ int FS::append(std::string filepath1, std::string filepath2)
 		std::cerr << "Path not valid." << std::endl;
 		return -1;
 	}
+
+	if (!(entry2.access_rights & WRITE))
+	{
+		std::cerr << "Error! You do not have access rights to write to that file. Therefore you can not copy it." << std::endl;
+		return -1;
+	}
+	
 	uint8_t file1[BLOCK_SIZE];
 	size_t binlastblock2 = entry2.size % BLOCK_SIZE;
 
