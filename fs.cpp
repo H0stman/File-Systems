@@ -211,63 +211,40 @@ int FS::ls()
 
 	//Read the current paths dir and block.
 	uint8_t buff[BLOCK_SIZE] = { 0 };
-	dir_entry* dirblock = (dir_entry*)buff;
-	dir_entry currentDir = find_dir_entry(this->path);
-	if (!(currentDir.access_rights & EXECUTE))
+	dir_entry* currentDir = get_entry(this->path);
+	if (!(currentDir->access_rights & EXECUTE))
 	{
 		std::cerr << "Error! You do not have access rights to execute this folder. Therefore you can not list its files." << std::endl;
 		return -1;
 	}
-	disk.read(currentDir.first_blk, (uint8_t*)dirblock);
-	dir_entry* file_entry = nullptr;
-	file_entry = dirblock; //Set the first file entry to be the start of the directory block.
+	disk.read(currentDir->first_blk, buff);
+	dir_entry* file_entry = (dir_entry*)buff; //Set the first file entry to be the start of the directory block.
 
-	if (*file_entry->file_name != '/')
+	for (size_t i = 0; i < BLOCK_SIZE / sizeof(dir_entry); ++i, ++file_entry)
 	{
+		if (file_entry->file_name[0] == '/')
+			continue;
 
-		//Check the access rights and construct the string.
 		std::string accessRights = "";
-		if (file_entry->access_rights & READ)
-			accessRights.append("r");
-		else
-			accessRights.append("-");
 
-		if (file_entry->access_rights & WRITE)
-			accessRights.append("w");
-		else
-			accessRights.append("-");
-
-		if (file_entry->access_rights & EXECUTE)
-			accessRights.append("x");
-		else
-			accessRights.append("-");
-
-		//Write out the current blocks content.
-		std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
-
-		for (long unsigned int i = 1; i < BLOCK_SIZE / sizeof(dir_entry); i++)
+		if (file_entry->file_name[0] != '\0')
 		{
-			accessRights = "";
-			file_entry++;
-			if (file_entry->file_name[0] != '\0')
-			{
-				if (file_entry->access_rights & READ)
-					accessRights.append("r");
-				else
-					accessRights.append("-");
+			if (file_entry->access_rights & READ)
+				accessRights.append("r");
+			else
+				accessRights.append("-");
 
-				if (file_entry->access_rights & WRITE)
-					accessRights.append("w");
-				else
-					accessRights.append("-");
+			if (file_entry->access_rights & WRITE)
+				accessRights.append("w");
+			else
+				accessRights.append("-");
 
-				if (file_entry->access_rights & EXECUTE)
-					accessRights.append("x");
-				else
-					accessRights.append("-");
+			if (file_entry->access_rights & EXECUTE)
+				accessRights.append("x");
+			else
+				accessRights.append("-");
 
-				std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
-			}
+			std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
 		}
 	}
 	return 0;
@@ -437,7 +414,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	//If front is not /, then the path is relative -> Make it absolute.
 	if (sourcepath.front() != '/')
 		sourcepath = path + sourcepath;
-	
+
 	dir_entry* sourceDir = get_entry(sourcepath);
 	//If it is a directory or doesnt exist at all.
 	if (sourceDir->type == TYPE_DIR || !sourceDir)
@@ -492,7 +469,8 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		}
 
 		//If it was not the root slash remove it and we now know that the source is to be moved into a destination that is not "/".
-		else {
+		else
+		{
 			//Here we know that destDir is pointing at a folder that is not "/", and that the source is to be moved into
 			//this folder.
 			destblockNr = destDir->first_blk;
@@ -675,7 +653,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 							return -1;
 						}
 					}
-					
+
 					//Write it back to disk.
 					disk.write(destblockNr, (uint8_t*)buff);
 
@@ -829,7 +807,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			}
 		}
 		//It is a file, overwrite it. UPDATE FAT TABLE.
-		else 
+		else
 		{
 			//Save the oldname of the source, to be able to find the dir later.
 			std::string oldName = sourceDir->file_name;
@@ -1053,7 +1031,7 @@ int FS::append(std::string filepath1, std::string filepath2)
 		std::cerr << "Error! You do not have access rights to write to that file. Therefore you can not copy it." << std::endl;
 		return -1;
 	}
-	
+
 	uint8_t file1[BLOCK_SIZE];
 	size_t binlastblock2 = entry2.size % BLOCK_SIZE;
 
@@ -1150,16 +1128,14 @@ int FS::mkdir(std::string dirpath)
 		return -1;
 	}
 
-	if (dirpath[0] != '/')
-		dirpath = path + dirpath;
+	auto pathvec = split_path(dirpath);
+	auto cpathvec = split_path(path);
+	if (pathvec[0] != "/")
+		pathvec.insert(pathvec.begin(), cpathvec.begin(), cpathvec.end());
 
 	//Get the name of the new dir.
-	std::string temppath = "";
-
-	temppath = dirpath.substr(dirpath.find_last_of('/') + 1, dirpath.length() - 1);
-	dirpath.erase(dirpath.find_last_of('/'), dirpath.length() - 1);
-
-	currentDir = get_entry(dirpath);
+	std::string temppath = pathvec.back().c_str();
+	currentDir = get_entry(path);
 	//New directory
 	dir_entry newDir;
 	temppath.copy(newDir.file_name, 56);
@@ -1546,7 +1522,7 @@ dir_entry* FS::get_entry(std::string filepath)
 	{
 		for (; it->file_name[0] != '\0'; it++)
 		{
-			if (s == "/")
+			if (s == "/" && pathvec.size() != 1)
 			{
 				++it;
 				break;
