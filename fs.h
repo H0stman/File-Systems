@@ -45,8 +45,6 @@ class FS
     //Helper functions
     int find_empty();
     std::vector<int> find_multiple_empty(int numBlocks);
-    dir_entry find_dir_entry(const std::string filepath);
-    int updateSize(uint32_t size, std::string updateFrom);
     dir_entry* get_entry(std::string filepath);
     std::vector<std::string> split_path(std::string filepath);
     std::string path;

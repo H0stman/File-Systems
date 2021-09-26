@@ -142,13 +142,6 @@ int FS::create(std::string filepath)
 	fentry.type = TYPE_FILE;
 	fentry.size = result.size();
 
-	//Update all the sizes in the hierarchy.
-	// if (updateSize(fentry.size, filepath) == -1)
-	// {
-	// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-	// 	return -1;
-	// }
-
 	//Read current dir block.
 	dir_entry* dirblock = (dir_entry*)strblock;
 	disk.read(currentDir->first_blk, (uint8_t*)dirblock);
@@ -373,13 +366,6 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	fentry.type = TYPE_FILE;
 	fentry.size = dataSize;
 
-	//Update folders sizes.
-	// if (updateSize(fentry.size, destfilepath) == -1)
-	// {
-	// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-	// 	return -1;
-	// }
-
 	//Read current directory block.
 	uint8_t buff[BLOCK_SIZE] = { 0 };
 	dir_entry* dirblock = (dir_entry*)buff;
@@ -520,18 +506,8 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			dirblock[k] = *sourceDir;
 		}
 
-		//We only need to update the size when not adding to root..
-		if (destblockNr != ROOT_BLOCK)
-		{
-			// if (updateSize(sourceDir->size, shortdest) == -1)
-			// {
-			// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-			// 	return -1;
-			// }
-		}
 		//Write it back to disk.
 		disk.write(destblockNr, (uint8_t*)buff);
-
 
 		//We now also need to remove the dir_entry from the source.
 		//Get the dir of the folder the sourcefile is in.
@@ -569,18 +545,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			k++;
 
 		//Make the dir_entry 0.
-		dirblock[k] = dir_entry(); //?????
-
-		//We do not need to update the size of anything in the tree when removing something from root.
-		//Only update size if it was not in the rootblock.
-		if (sourceblockNr != ROOT_BLOCK)
-		{
-			// if (updateSize(-sourceDir->size, shortsource) == -1)
-			// {
-			// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-			// 	return -1;
-			// }
-		}
+		dirblock[k] = dir_entry();
 
 		//Write it back to disk after removing the old dir_entry.
 		disk.write(sourceblockNr, (uint8_t*)buff);
@@ -651,24 +616,6 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					//We already know the name is correct.
 					dirblock[k] = *sourceDir;
 
-					//Only update the sizes if its not in rootblock.
-					if (destblockNr != ROOT_BLOCK)
-					{
-						//Update size by first subtracting the replaced dir.
-						// if (updateSize(-replaced_dir->size, destpath) == -1)
-						// {
-						// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-						// 	return -1;
-						// }
-
-						//Then we update the size again to account for the newly added sourcefile in the destination.
-						// if (updateSize(sourceDir->size, destpath) == -1)
-						// {
-						// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-						// 	return -1;
-						// }
-					}
-
 					//Write it back to disk.
 					disk.write(destblockNr, (uint8_t*)buff);
 
@@ -708,17 +655,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 						k++;
 
 					//Make the dir_entry 0.
-					dirblock[k] = dir_entry(); //?????
-
-					//Only update size if it was not in the rootblock.
-					if (sourceblockNr != ROOT_BLOCK)
-					{
-						// if (updateSize(-sourceDir->size, shortsource) == -1)
-						// {
-						// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-						// 	return -1;
-						// }
-					}
+					dirblock[k] = dir_entry();
 
 					//Write it back to disk after removing the old dir_entry.
 					disk.write(sourceblockNr, (uint8_t*)buff);
@@ -752,17 +689,6 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				}
 				//Put the source directory in the empty spot, after changing its name.
 				dirblock[k] = *sourceDir;
-
-				//Only update the sizes if its not in rootblock.
-				if (destblockNr != ROOT_BLOCK)
-				{
-					//We update the size to account for the newly added sourcefile in the destination.
-					// if (updateSize(sourceDir->size, destpath) == -1)
-					// {
-					// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-					// 	return -1;
-					// }
-				}
 
 				//Write it back to disk.
 				disk.write(destblockNr, (uint8_t*)buff);
@@ -803,17 +729,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					k++;
 
 				//Make the dir_entry 0.
-				dirblock[k] = dir_entry(); //?????
-
-				//Only update size if it was not in the rootblock.
-				if (sourceblockNr != ROOT_BLOCK)
-				{
-					// if (updateSize(-sourceDir->size, shortsource) == -1)
-					// {
-					// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-					// 	return -1;
-					// }
-				}
+				dirblock[k] = dir_entry();
 
 				//Write it back to disk after removing the old dir_entry.
 				disk.write(sourceblockNr, (uint8_t*)buff);
@@ -882,24 +798,6 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			strncpy(sourceDir->file_name, destDir->file_name, 56);
 			dirblock[k] = *sourceDir;
 
-			//Only update the sizes if its not in rootblock.
-			if (destblockNr != ROOT_BLOCK)
-			{
-				//Update size by first subtracting the replaced dir.
-				// if (updateSize(-destDir->size, destpath) == -1)
-				// {
-				// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-				// 	return -1;
-				// }
-
-				//Then we update the size again to account for the newly added sourcefile in the destination.
-				// if (updateSize(sourceDir->size, destpath) == -1)
-				// {
-				// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-				// 	return -1;
-				// }
-			}
-
 			//Write it back to disk.
 			disk.write(destblockNr, (uint8_t*)buff);
 
@@ -939,17 +837,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				k++;
 
 			//Make the dir_entry 0.
-			dirblock[k] = dir_entry(); //?????
-
-			//Only update size if it was not in the rootblock.
-			if (sourceblockNr != ROOT_BLOCK)
-			{
-				// if (updateSize(-sourceDir->size, shortsource) == -1)
-				// {
-				// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-				// 	return -1;
-				// }
-			}
+			dirblock[k] = dir_entry();
 
 			//Write it back to disk after removing the old dir_entry.
 			disk.write(sourceblockNr, (uint8_t*)buff);
@@ -1018,12 +906,6 @@ int FS::rm(std::string filepath)
 	entry->size = 0u;
 	entry->type = TYPE_FILE;
 	disk.write(currentDir->first_blk, block);
-
-	// if (updateSize(-tempSize, filepath) == -1)
-	// {
-	// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-	// 	return -1;
-	// }
 
 	return 0;
 }
@@ -1381,165 +1263,6 @@ std::vector<int> FS::find_multiple_empty(int numBlocks)
 	}
 
 	return empty_spots;
-}
-
-//Returns the dir_entry of filepath
-dir_entry FS::find_dir_entry(std::string filepath)
-{
-	///TODO: Rerwrite this whole finction since we do not have a folder named root anymore. And there is a simpler way of doing this.
-	//Read root block.
-	uint8_t block[BLOCK_SIZE] = { 0 };
-	disk.read(ROOT_BLOCK, block);
-	dir_entry* dirblock = (dir_entry*)(block);
-
-	// if (filepath.back() != '/')
-	// 	filepath.append("/");
-
-	// if (filepath.find("/") != 0u)
-	// 	filepath = path + filepath;
-
-	//filepath = "root" + filepath;
-
-	size_t start_i = 0, end_i = 0, i = 0;
-
-	while ((end_i = filepath.find('/', end_i)) not_eq std::string::npos)
-	{
-		i = 0;
-		std::string dirname = filepath.substr(start_i, end_i - start_i);
-		while (dirname.compare(dirblock->file_name)) //Check if dir_entry name exists in this folder.
-		{
-			dirblock++;
-			i++;
-			if (i == std::floor(BLOCK_SIZE / sizeof(dir_entry)))
-				return dir_entry();
-		}
-
-		start_i = ++end_i;
-
-		//This folder exists, load in that folders disk block.
-		if ((end_i = filepath.find('/', end_i)) not_eq std::string::npos)
-		{
-			disk.read(dirblock->first_blk, block);
-			dirblock = (dir_entry*)block;
-		}
-	}
-	return ((dir_entry*)block)[i];
-}
-
-int FS::updateSize(uint32_t size, std::string updateFrom)
-{
-	std::string currentDir = "";
-
-	//If the last part of the path is a file. Remove it from the string so that the path only contains directories.
-	auto check = get_entry(updateFrom);
-	if (check->type == TYPE_FILE)
-	{
-		dir_entry* file = get_entry(updateFrom);
-		file->size += size;
-
-		while (updateFrom.back() != '/' && updateFrom != "")
-			updateFrom.pop_back();
-
-		if (updateFrom.back() == '/' && updateFrom.size() > 1)
-			updateFrom.pop_back();
-
-		dir_entry* homeFolder = get_entry(updateFrom);
-		uint8_t block[BLOCK_SIZE] = { 0 };
-		disk.read(homeFolder->first_blk, block);
-		dir_entry* entry = (dir_entry*)block;
-		int i = 0;
-		while (std::strcmp(file->file_name, entry->file_name) && i < std::floor(BLOCK_SIZE / sizeof(dir_entry)))
-		{
-			i++;
-			entry++;
-		}
-		*entry = *file;
-
-		disk.write(homeFolder->first_blk, block);
-	}
-
-	//if it is a relative path, make it an absolute path.
-	if (updateFrom[0] != '/')
-		updateFrom = path + updateFrom;
-
-	dir_entry* currentEntry;
-	uint8_t block[BLOCK_SIZE] = { 0 };
-
-	while (updateFrom.find('/') != std::string::npos && updateFrom != "/")
-	{
-		currentDir = "";
-
-		//Extract the folder at the end of the path.
-		size_t lastslash = updateFrom.find_last_of("/");
-		if (updateFrom.size() > 1)
-			currentDir = updateFrom.substr(lastslash + 1, updateFrom.size() - 1);
-		else
-			currentDir = "/";
-
-		//Do this for all folders except root, which is handled later.
-		if (currentDir != "/" && currentDir != "..")
-		{
-			//Get the dir for the current folder and increase the size.
-			currentEntry = get_entry(updateFrom);
-			currentEntry->size += size;
-
-			//Read this folder's block
-			dir_entry* dirblock = (dir_entry*)block;
-			disk.read(currentEntry->first_blk, (uint8_t*)dirblock);
-
-			//Save the index of the block where the directory lies.
-			int block_number = dirblock->first_blk;
-			//Then read the block where the directory was.
-			disk.read(dirblock->first_blk, (uint8_t*)dirblock);
-
-			//Find the spot where the dir is.
-			int j = 0;
-			while (std::strcmp(currentEntry->file_name, dirblock->file_name) && j < std::floor(BLOCK_SIZE / sizeof(dir_entry)))
-			{
-				j++;
-				dirblock++;
-			}
-			//Replace it with the entry that has an updated size.
-			*dirblock = *currentEntry;
-
-			//Write back the block.
-			disk.write(block_number, block);
-		}
-
-		if (updateFrom.back() == '/')
-			updateFrom.pop_back();
-
-		if (currentDir == "..")
-		{
-			updateFrom.erase(updateFrom.find(currentDir), currentDir.length());
-			updateFrom.pop_back();
-			while (updateFrom.back() != '/')
-				updateFrom.pop_back();
-		}
-		else
-			updateFrom.erase(updateFrom.find(currentDir), currentDir.length()); //Erase the found folder from the end of the path.
-
-		//Remove the slash at the end of the path.
-		updateFrom.pop_back();
-	}
-
-	updateFrom = "/";
-
-	//For the root map.
-	//---------------------------------------------
-	//Get the root dir and update its size.
-	currentEntry = get_entry(updateFrom);
-	currentEntry->size += size;
-
-	//Read the root block.
-	dir_entry* dirblock = (dir_entry*)block;
-	disk.read(ROOT_BLOCK, block);
-
-	//Put back the updated root directory.
-	dirblock[0] = *currentEntry;
-
-	disk.write(ROOT_BLOCK, block);
-	return 0;
 }
 
 //Retrives the entry of a given filelpath. If the entry is not found, nullptr is returned.
