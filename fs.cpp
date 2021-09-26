@@ -63,7 +63,7 @@ int FS::create(std::string filepath)
 		free(exist);
 		return -1;
 	}
-	
+
 
 	//Read input from user.
 	std::string input = "", result = "";
@@ -484,7 +484,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		{
 			std::cerr << "Error! The destination path does not exist!" << std::endl;
 			free(sourceDir);
-			if(destDir->type == TYPE_FILE)
+			if (destDir->type == TYPE_FILE)
 				free(destDir);
 			return -1;
 		}
@@ -961,7 +961,6 @@ int FS::rm(std::string filepath)
 	entry->type = TYPE_FILE;
 	disk.write(currentDir->first_blk, block);
 	disk.write(FAT_BLOCK, (uint8_t*)fat);
-
 	free(currentDir);
 	return 0;
 }
@@ -978,9 +977,9 @@ int FS::append(std::string filepath1, std::string filepath2)
 	if (!entry1 or !entry2)
 	{
 		std::cerr << "Path not valid." << std::endl;
-		if(entry1)
+		if (entry1)
 			free(entry1);
-		if(entry2)
+		if (entry2)
 			free(entry2);
 		return -1;
 	}
