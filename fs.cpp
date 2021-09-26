@@ -565,7 +565,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 		//Find the dir.
 		k = 1;
-		while (dirblock[k].file_name != oldName && k < BLOCK_SIZE / sizeof(dir_entry))
+		while (std::string(dirblock[k].file_name).compare(oldName) && k < BLOCK_SIZE / sizeof(dir_entry))
 			k++;
 
 		//Make the dir_entry 0.
@@ -644,7 +644,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 					//Find the dir that is too be replaced.
 					size_t k = 1;
-					while (dirblock[k].file_name != replaced_dir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+					while (std::string(dirblock[k].file_name).compare(replaced_dir->file_name) && k < BLOCK_SIZE / sizeof(dir_entry))
 						k++;
 
 					//Replace the info in that directory with the source dir information.
@@ -704,7 +704,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 					//Find the dir.
 					k = 1;
-					while (dirblock[k].file_name != sourceDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+					while (std::string(dirblock[k].file_name).compare(sourceDir->file_name) && k < BLOCK_SIZE / sizeof(dir_entry))
 						k++;
 
 					//Make the dir_entry 0.
@@ -799,7 +799,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 				//Find the dir.
 				k = 1;
-				while (dirblock[k].file_name != sourceDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+				while (std::string(dirblock[k].file_name).compare(sourceDir->file_name) && k < BLOCK_SIZE / sizeof(dir_entry))
 					k++;
 
 				//Make the dir_entry 0.
@@ -874,7 +874,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 			//Find the dir that is too be replaced.
 			size_t k = 1;
-			while (dirblock[k].file_name != destDir->file_name && k < BLOCK_SIZE / sizeof(dir_entry))
+			while (std::string(dirblock[k].file_name).compare(destDir->file_name) && k < BLOCK_SIZE / sizeof(dir_entry))
 				k++;
 
 			//Replace the info in that directory with the source dir information, also rename the file.
@@ -935,7 +935,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 			//Find the dir.
 			k = 1;
-			while (dirblock[k].file_name != oldName && k < BLOCK_SIZE / sizeof(dir_entry))
+			while (std::string(dirblock[k].file_name).compare(oldName) && k < BLOCK_SIZE / sizeof(dir_entry))
 				k++;
 
 			//Make the dir_entry 0.
