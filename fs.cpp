@@ -24,6 +24,8 @@ int FS::format()
 	uint8_t block[BLOCK_SIZE] = { 0 };
 
 	disk.write(ROOT_BLOCK, block);
+	for (unsigned int i = 2; i < disk.get_no_blocks(); i++)
+		disk.write(i, block);
 
 	dir_entry* entry = (dir_entry*)block;
 
@@ -283,7 +285,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		return -1;
 	}
 
-	if (get_entry(destfilepath)->file_name[0] != '\0')
+	if (get_entry(destfilepath))
 	{
 		std::cerr << "Error! Destination already exists." << std::endl;
 		return -1;
@@ -372,11 +374,11 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	fentry.size = dataSize;
 
 	//Update folders sizes.
-	if (updateSize(fentry.size, destfilepath) == -1)
-	{
-		std::cerr << "Error! Could not update the sizes." << std::endl;
-		return -1;
-	}
+	// if (updateSize(fentry.size, destfilepath) == -1)
+	// {
+	// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+	// 	return -1;
+	// }
 
 	//Read current directory block.
 	uint8_t buff[BLOCK_SIZE] = { 0 };
@@ -423,7 +425,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	dir_entry* dirblock = (dir_entry*)buff;
 
 	//SOURCE ---------------------------------------------------------------
-	//Check if the path is relative or absolute.
+	//Chelsck if the path is relative or absolute.
 	//If front is not /, then the path is relative -> Make it absolute.
 	if (sourcepath.front() != '/')
 		sourcepath = path + sourcepath;
@@ -521,11 +523,11 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		//We only need to update the size when not adding to root..
 		if (destblockNr != ROOT_BLOCK)
 		{
-			if (updateSize(sourceDir->size, shortdest) == -1)
-			{
-				std::cerr << "Error! Could not update the sizes." << std::endl;
-				return -1;
-			}
+			// if (updateSize(sourceDir->size, shortdest) == -1)
+			// {
+			// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+			// 	return -1;
+			// }
 		}
 		//Write it back to disk.
 		disk.write(destblockNr, (uint8_t*)buff);
@@ -573,11 +575,11 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		//Only update size if it was not in the rootblock.
 		if (sourceblockNr != ROOT_BLOCK)
 		{
-			if (updateSize(-sourceDir->size, shortsource) == -1)
-			{
-				std::cerr << "Error! Could not update the sizes." << std::endl;
-				return -1;
-			}
+			// if (updateSize(-sourceDir->size, shortsource) == -1)
+			// {
+			// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+			// 	return -1;
+			// }
 		}
 
 		//Write it back to disk after removing the old dir_entry.
@@ -653,18 +655,18 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					if (destblockNr != ROOT_BLOCK)
 					{
 						//Update size by first subtracting the replaced dir.
-						if (updateSize(-replaced_dir->size, destpath) == -1)
-						{
-							std::cerr << "Error! Could not update the sizes." << std::endl;
-							return -1;
-						}
+						// if (updateSize(-replaced_dir->size, destpath) == -1)
+						// {
+						// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+						// 	return -1;
+						// }
 
 						//Then we update the size again to account for the newly added sourcefile in the destination.
-						if (updateSize(sourceDir->size, destpath) == -1)
-						{
-							std::cerr << "Error! Could not update the sizes." << std::endl;
-							return -1;
-						}
+						// if (updateSize(sourceDir->size, destpath) == -1)
+						// {
+						// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+						// 	return -1;
+						// }
 					}
 
 					//Write it back to disk.
@@ -711,11 +713,11 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					//Only update size if it was not in the rootblock.
 					if (sourceblockNr != ROOT_BLOCK)
 					{
-						if (updateSize(-sourceDir->size, shortsource) == -1)
-						{
-							std::cerr << "Error! Could not update the sizes." << std::endl;
-							return -1;
-						}
+						// if (updateSize(-sourceDir->size, shortsource) == -1)
+						// {
+						// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+						// 	return -1;
+						// }
 					}
 
 					//Write it back to disk after removing the old dir_entry.
@@ -755,11 +757,11 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				if (destblockNr != ROOT_BLOCK)
 				{
 					//We update the size to account for the newly added sourcefile in the destination.
-					if (updateSize(sourceDir->size, destpath) == -1)
-					{
-						std::cerr << "Error! Could not update the sizes." << std::endl;
-						return -1;
-					}
+					// if (updateSize(sourceDir->size, destpath) == -1)
+					// {
+					// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+					// 	return -1;
+					// }
 				}
 
 				//Write it back to disk.
@@ -806,11 +808,11 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				//Only update size if it was not in the rootblock.
 				if (sourceblockNr != ROOT_BLOCK)
 				{
-					if (updateSize(-sourceDir->size, shortsource) == -1)
-					{
-						std::cerr << "Error! Could not update the sizes." << std::endl;
-						return -1;
-					}
+					// if (updateSize(-sourceDir->size, shortsource) == -1)
+					// {
+					// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+					// 	return -1;
+					// }
 				}
 
 				//Write it back to disk after removing the old dir_entry.
@@ -884,18 +886,18 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			if (destblockNr != ROOT_BLOCK)
 			{
 				//Update size by first subtracting the replaced dir.
-				if (updateSize(-destDir->size, destpath) == -1)
-				{
-					std::cerr << "Error! Could not update the sizes." << std::endl;
-					return -1;
-				}
+				// if (updateSize(-destDir->size, destpath) == -1)
+				// {
+				// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+				// 	return -1;
+				// }
 
 				//Then we update the size again to account for the newly added sourcefile in the destination.
-				if (updateSize(sourceDir->size, destpath) == -1)
-				{
-					std::cerr << "Error! Could not update the sizes." << std::endl;
-					return -1;
-				}
+				// if (updateSize(sourceDir->size, destpath) == -1)
+				// {
+				// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+				// 	return -1;
+				// }
 			}
 
 			//Write it back to disk.
@@ -942,11 +944,11 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			//Only update size if it was not in the rootblock.
 			if (sourceblockNr != ROOT_BLOCK)
 			{
-				if (updateSize(-sourceDir->size, shortsource) == -1)
-				{
-					std::cerr << "Error! Could not update the sizes." << std::endl;
-					return -1;
-				}
+				// if (updateSize(-sourceDir->size, shortsource) == -1)
+				// {
+				// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+				// 	return -1;
+				// }
 			}
 
 			//Write it back to disk after removing the old dir_entry.
@@ -1012,16 +1014,16 @@ int FS::rm(std::string filepath)
 	for (size_t i = 0; i < 56; i++)
 		entry->file_name[i] = '\0';
 	entry->first_blk = 0u;
-	uint32_t tempSize = entry->size; //Save the size for the update function.
+	//uint32_t tempSize = entry->size; //Save the size for the update function.
 	entry->size = 0u;
 	entry->type = TYPE_FILE;
 	disk.write(currentDir->first_blk, block);
 
-	if (updateSize(-tempSize, filepath) == -1)
-	{
-		std::cerr << "Error! Could not update the sizes." << std::endl;
-		return -1;
-	}
+	// if (updateSize(-tempSize, filepath) == -1)
+	// {
+	// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+	// 	return -1;
+	// }
 
 	return 0;
 }
@@ -1031,8 +1033,10 @@ int FS::rm(std::string filepath)
 int FS::append(std::string filepath1, std::string filepath2)
 {
 	std::cout << "FS::append(" << filepath1 << "," << filepath2 << ")\n";
+
 	dir_entry* entry1 = get_entry(filepath1);
 	dir_entry* entry2 = get_entry(filepath2);
+
 	if (!entry1 or !entry2)
 	{
 		std::cerr << "Path not valid." << std::endl;
@@ -1070,11 +1074,27 @@ int FS::append(std::string filepath1, std::string filepath2)
 			*it2 = *it1;
 		disk.write(lastfatfile2, file2);
 
-		if (updateSize(entry1->size, filepath2) == -1) //Update the sizes after the move.
+		//Find the entry update its size and write to disk.
+		std::string parentpath = path + filepath2;
+		parentpath = parentpath.substr(0u, parentpath.find_last_of('/') + 1);
+		auto parententry = get_entry(parentpath);
+		disk.read(parententry->first_blk, file1);
+		for (dir_entry* i = (dir_entry*)file1;; i++)
 		{
-			std::cerr << "Error! Could not update the sizes." << std::endl;
-			return -1;
+			if (!std::string(entry2->file_name).compare(i->file_name))
+			{
+				i->size += entry1->size;
+				break;
+			}
 		}
+
+		disk.write(parententry->first_blk, file1);
+
+		// if (updateSize(entry1->size, filepath2) == -1) //Update the sizes after the move.
+		// {
+		// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+		// 	return -1;
+		// }
 		return 0;
 	}
 	else
@@ -1120,11 +1140,11 @@ int FS::append(std::string filepath1, std::string filepath2)
 	}
 	fat[originallastblock] = EOF;
 
-	if (updateSize(entry1->size, filepath2) == -1) //Update the sizes after the append.
-	{
-		std::cerr << "Error! Could not update the sizes." << std::endl;
-		return -1;
-	}
+	// if (updateSize(entry1->size, filepath2) == -1) //Update the sizes after the append.
+	// {
+	// 	std::cerr << "Error! Could not update the sizes." << std::endl;
+	// 	return -1;
+	// }
 	return 0;
 }
 
