@@ -275,9 +275,9 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	std::cout << "FS::cp(" << sourcefilepath << "," << destfilepath << ")\n";
 
 	if (destfilepath[0] != '/')
-			destfilepath = path + destfilepath;
+		destfilepath = path + destfilepath;
 	if (sourcefilepath[0] != '/')
-			sourcefilepath = path + sourcefilepath;	
+		sourcefilepath = path + sourcefilepath;
 	//Find the dir_entry for the source.
 	dir_entry* sourceDir = get_entry(sourcefilepath);
 	if (sourceDir->file_name[0] == '\0')
@@ -307,7 +307,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	{
 		std::cerr << "Error! You do not have access rights to read that file. Therefore you can not copy it." << std::endl;
 		free(sourceDir);
-		if(destDir)
+		if (destDir)
 			free(destDir);
 		return -1;
 	}
@@ -315,9 +315,9 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	if (!destDir)
 	{
 		std::string parentpath = path + destfilepath;
-    	parentpath = parentpath.substr(0u, parentpath.find_last_of('/') + 1);
+		parentpath = parentpath.substr(0u, parentpath.find_last_of('/') + 1);
 		destDir = get_entry(parentpath);
-		if(!destDir)
+		if (!destDir)
 		{
 			std::cerr << "Error! You have entered a faulty destination path." << std::endl;
 			free(sourceDir);
@@ -1102,6 +1102,9 @@ int FS::append(std::string filepath1, std::string filepath2)
 				lastfatfile2 = empty[i++];
 				it2 = file2;
 			}
+			else
+				disk.write(lastfatfile2, file2);
+
 		}
 	}
 
@@ -1222,13 +1225,13 @@ int FS::cd(std::string dirpath)
 	dir_entry* destDir = get_entry(dirpath);
 	if (!destDir) //Checks if path is valid.
 		return -1;
-	if(destDir->type == TYPE_FILE)
+	if (destDir->type == TYPE_FILE)
 	{
 		std::cerr << "ERROR! Not a directory." << std::endl;
 		free(destDir);
 		return -1;
 	}
-	
+
 	if (dirpath.back() != '/')
 		dirpath.append("/");
 	if (dirpath[0] == '/') //Absolute path.
