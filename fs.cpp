@@ -274,6 +274,10 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 {
 	std::cout << "FS::cp(" << sourcefilepath << "," << destfilepath << ")\n";
 
+	if (destfilepath[0] != '/')
+			destfilepath = path + destfilepath;
+	if (sourcefilepath[0] != '/')
+			sourcefilepath = path + sourcefilepath;	
 	//Find the dir_entry for the source.
 	dir_entry* sourceDir = get_entry(sourcefilepath);
 	if (sourceDir->file_name[0] == '\0')
@@ -291,9 +295,9 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	}
 
 	dir_entry* destDir = get_entry(destfilepath);
-	if (destDir)
+	if (destDir && destDir->type == TYPE_FILE)
 	{
-		std::cerr << "Error! Destination already exists." << std::endl;
+		std::cerr << "Error! Destination file already exists." << std::endl;
 		free(sourceDir);
 		free(destDir);
 		return -1;
@@ -303,9 +307,45 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	{
 		std::cerr << "Error! You do not have access rights to read that file. Therefore you can not copy it." << std::endl;
 		free(sourceDir);
+		if(destDir)
+			free(destDir);
 		return -1;
 	}
 
+	if (!destDir)
+	{
+		std::string parentpath = path + destfilepath;
+    	parentpath = parentpath.substr(0u, parentpath.find_last_of('/') + 1);
+		destDir = get_entry(parentpath);
+		if(!destDir)
+		{
+			std::cerr << "Error! You have entered a faulty destination path." << std::endl;
+			free(sourceDir);
+			return -1;
+		}
+		//Copy to parent folder. With destfilepath name.
+		auto nameVector = split_path(destfilepath);
+		nameVector.back().copy(sourceDir->file_name, 56, 0);
+	}
+	else
+	{
+		//This means destDir is a folder.
+		//Check inside the folder to see if the sourcename already exists.
+		std::vector<std::string> split_sourcefilepath = split_path(sourcefilepath);
+		std::string name = split_sourcefilepath[split_sourcefilepath.size() - 1];
+		std::string longpath = destfilepath + '/' + name;
+		dir_entry* replaced_dir = get_entry(longpath);
+		if (replaced_dir)
+		{
+			std::cerr << "Error! The filename already exists inside the destination path." << std::endl;
+			free(sourceDir);
+			free(destDir);
+			free(replaced_dir);
+			return -1;
+		}
+
+		//Copy to destDir folder with original name.
+	}
 	//Calculate the number of blocks that the source occupies.
 	size_t nrBlocks = std::ceil((float)sourceDir->size / (float)BLOCK_SIZE);
 	std::vector<int> empty_spots(nrBlocks);
@@ -318,6 +358,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		if (empty_spots[0] == -1)
 		{
 			std::cerr << "ERROR! No empty spots in the FAT." << std::endl;
+			free(destDir);
 			free(sourceDir);
 			return -1;
 		}
@@ -340,6 +381,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		{
 			std::cerr << "ERROR! Not enough empty spots in the FAT." << std::endl;
 			free(sourceDir);
+			free(destDir);
 			return -1;
 		}
 
@@ -365,20 +407,9 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		}
 	}
 
-	//If the destination path is a relative path, make it absolute.
-	if (destfilepath[0] != '/')
-		destfilepath = path + destfilepath;
-
-	//Get the name of the destination file, if there is a slash in the destfilepath.
-	std::string temppath = destfilepath;
-	temppath = destfilepath.substr(destfilepath.find_last_of('/') + 1, destfilepath.length() - 1);
-	destfilepath.erase(destfilepath.find_last_of('/'), destfilepath.length() - 1);
-
-	dir_entry* currentDir = get_entry(destfilepath);
-
 	//Create the directory entry for the new file.
 	dir_entry fentry;
-	temppath.copy(fentry.file_name, temppath.size());
+	std::string(sourceDir->file_name).copy(fentry.file_name, 56);
 	fentry.access_rights = READ | WRITE | EXECUTE;
 	fentry.first_blk = empty_spots[0];
 	fentry.type = TYPE_FILE;
@@ -387,7 +418,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	//Read current directory block.
 	uint8_t buff[BLOCK_SIZE] = { 0 };
 	dir_entry* dirblock = (dir_entry*)buff;
-	disk.read(currentDir->first_blk, (uint8_t*)dirblock);
+	disk.read(destDir->first_blk, (uint8_t*)dirblock);
 
 	//Find an empty spot for the new directory.
 	size_t k = 1;
@@ -398,7 +429,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	if (dirblock[k].file_name[0] != '\0')
 	{
 		free(sourceDir);
-		free(currentDir);
+		free(destDir);
 		std::cerr << "ERROR! No more space for dir_entries in the current block." << std::endl;
 		return -1;
 	}
@@ -416,9 +447,9 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 
 	//Uppdate the FAT and current directory block ON THE DISK.
 	disk.write(FAT_BLOCK, (uint8_t*)fat);
-	disk.write(currentDir->first_blk, (uint8_t*)dirblock);
+	disk.write(destDir->first_blk, (uint8_t*)dirblock);
 	free(sourceDir);
-	free(currentDir);
+	free(destDir);
 	return 0;
 }
 
@@ -1186,7 +1217,6 @@ int FS::mkdir(std::string dirpath)
 // cd <dirpath> changes the current (working) directory to the directory named <dirpath>
 int FS::cd(std::string dirpath)
 {
-	///TODO: Rerwrite this whole finction since we do not have a folder named root anymore. And there is a simpler way of doing this.
 	std::cout << "FS::cd(" << dirpath << ")\n";
 
 	dir_entry* destDir = get_entry(dirpath);
@@ -1354,18 +1384,18 @@ dir_entry* FS::get_entry(std::string filepath)
 	uint8_t block[BLOCK_SIZE];
 	disk.read(ROOT_BLOCK, block);
 	dir_entry* it = (dir_entry*)block;
-	for (auto&& s : pathvec)
+	for (auto s = pathvec.begin(); s != pathvec.end(); ++s)
 	{
 		for (size_t i = 0; i < (size_t)std::floor(BLOCK_SIZE / sizeof(dir_entry)); it++, i++)
 		{
-			if (s == "/" && pathvec.size() != 1)
+			if (*s == "/" && pathvec.size() != 1)
 			{
 				++it;
 				break;
 			}
-			if (!s.compare(it->file_name))
+			if (!s.base()->compare(it->file_name))
 			{
-				if (!s.compare(pathvec.back()))
+				if (s == pathvec.end() - 1)
 				{
 					dir_entry* result = (dir_entry*)malloc(sizeof(dir_entry));
 					*result = *it;
