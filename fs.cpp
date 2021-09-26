@@ -1089,12 +1089,6 @@ int FS::append(std::string filepath1, std::string filepath2)
 		}
 
 		disk.write(parententry->first_blk, file1);
-
-		// if (updateSize(entry1->size, filepath2) == -1) //Update the sizes after the move.
-		// {
-		// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-		// 	return -1;
-		// }
 		return 0;
 	}
 	else
@@ -1140,11 +1134,21 @@ int FS::append(std::string filepath1, std::string filepath2)
 	}
 	fat[originallastblock] = EOF;
 
-	// if (updateSize(entry1->size, filepath2) == -1) //Update the sizes after the append.
-	// {
-	// 	std::cerr << "Error! Could not update the sizes." << std::endl;
-	// 	return -1;
-	// }
+	//Find the entry update its size and write to disk.
+	std::string parentpath = path + filepath2;
+	parentpath = parentpath.substr(0u, parentpath.find_last_of('/') + 1);
+	auto parententry = get_entry(parentpath);
+	disk.read(parententry->first_blk, file1);
+	for (dir_entry* i = (dir_entry*)file1;; i++)
+	{
+		if (!std::string(entry2->file_name).compare(i->file_name))
+		{
+			i->size += entry1->size;
+			break;
+		}
+	}
+
+	disk.write(parententry->first_blk, file1);
 	return 0;
 }
 
