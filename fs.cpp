@@ -60,8 +60,10 @@ int FS::create(std::string filepath)
 	if (exist)
 	{
 		std::cerr << "Error! That file or directory already exists." << std::endl;
+		free(exist);
 		return -1;
 	}
+	
 
 	//Read input from user.
 	std::string input = "", result = "";
@@ -155,6 +157,7 @@ int FS::create(std::string filepath)
 	if (dirblock[k].file_name[0] != '\0')
 	{
 		std::cerr << "ERROR! No more space for dir_entries in the current directory." << std::endl;
+		free(currentDir);
 		return -1;
 	}
 	//Put the new directory in the empty spot.
@@ -173,6 +176,7 @@ int FS::create(std::string filepath)
 	//Uppdate the FAT and current directory block ON THE DISK.
 	disk.write(FAT_BLOCK, (uint8_t*)fat);
 	disk.write(currentDir->first_blk, (uint8_t*)(dirblock));
+	free(currentDir);
 	return 0;
 }
 
@@ -185,16 +189,19 @@ int FS::cat(std::string filepath)
 	if (!entry)
 	{
 		std::cerr << "Error! File does not exist." << std::endl;
+		free(entry);
 		return 1;
 	}
 	if (entry->type == TYPE_DIR)
 	{
 		std::cerr << "Error! That is a directory!" << std::endl;
+		free(entry);
 		return -1;
 	}
 	if (!(entry->access_rights & READ))
 	{
 		std::cerr << "Error! You do not have access rights to read that file." << std::endl;
+		free(entry);
 		return -1;
 	}
 
@@ -209,6 +216,7 @@ int FS::cat(std::string filepath)
 			std::cout << block[i];
 	}
 	std::cout << std::endl;
+	free(entry);
 	return 0;
 }
 
@@ -223,6 +231,7 @@ int FS::ls()
 	if (!(currentDir->access_rights & EXECUTE))
 	{
 		std::cerr << "Error! You do not have access rights to execute this folder. Therefore you can not list its files." << std::endl;
+		free(currentDir);
 		return -1;
 	}
 	disk.read(currentDir->first_blk, buff);
@@ -255,6 +264,7 @@ int FS::ls()
 			std::cout << file_entry->file_name << "\t" << (int)file_entry->type << "\t" << accessRights << "\t" << (int)file_entry->size << std::endl;
 		}
 	}
+	free(currentDir);
 	return 0;
 }
 
@@ -269,24 +279,30 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	if (sourceDir->file_name[0] == '\0')
 	{
 		std::cerr << "Error! Source not found." << std::endl;
+		free(sourceDir);
 		return -1;
 	}
 
 	if (sourceDir->type == TYPE_DIR)
 	{
 		std::cerr << "Error! Source is a directory, not a file." << std::endl;
+		free(sourceDir);
 		return -1;
 	}
 
-	if (get_entry(destfilepath))
+	dir_entry* destDir = get_entry(destfilepath);
+	if (destDir)
 	{
 		std::cerr << "Error! Destination already exists." << std::endl;
+		free(sourceDir);
+		free(destDir);
 		return -1;
 	}
 
-	if (!(sourceDir->access_rights & WRITE))
+	if (!(sourceDir->access_rights & READ))
 	{
-		std::cerr << "Error! You do not have access rights to write to that file. Therefore you can not copy it." << std::endl;
+		std::cerr << "Error! You do not have access rights to read that file. Therefore you can not copy it." << std::endl;
+		free(sourceDir);
 		return -1;
 	}
 
@@ -302,6 +318,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		if (empty_spots[0] == -1)
 		{
 			std::cerr << "ERROR! No empty spots in the FAT." << std::endl;
+			free(sourceDir);
 			return -1;
 		}
 
@@ -322,6 +339,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 		if (empty_spots[0] == -1)
 		{
 			std::cerr << "ERROR! Not enough empty spots in the FAT." << std::endl;
+			free(sourceDir);
 			return -1;
 		}
 
@@ -379,6 +397,8 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	//If there is no empty spot.
 	if (dirblock[k].file_name[0] != '\0')
 	{
+		free(sourceDir);
+		free(currentDir);
 		std::cerr << "ERROR! No more space for dir_entries in the current block." << std::endl;
 		return -1;
 	}
@@ -397,6 +417,8 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 	//Uppdate the FAT and current directory block ON THE DISK.
 	disk.write(FAT_BLOCK, (uint8_t*)fat);
 	disk.write(currentDir->first_blk, (uint8_t*)dirblock);
+	free(sourceDir);
+	free(currentDir);
 	return 0;
 }
 
@@ -421,6 +443,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	if (sourceDir->type == TYPE_DIR || !sourceDir)
 	{
 		std::cerr << "Error! The source file does not exist!" << std::endl;
+		free(sourceDir);
 		return -1;
 	}
 	//-----------------------------------------------------------------------
@@ -429,6 +452,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 	if (destpath.size() == 0 || sourcepath == destpath)
 	{
 		std::cerr << "Error! A valid path has to be entered. Can not move a file to the same position it is already in, or rename a file to the same name it already has." << std::endl;
+		free(sourceDir);
 		return -1;
 	}
 	//Check if the path is relative or absolute.
@@ -459,6 +483,9 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		if (destDir->type == TYPE_FILE || !destDir)
 		{
 			std::cerr << "Error! The destination path does not exist!" << std::endl;
+			free(sourceDir);
+			if(destDir->type == TYPE_FILE)
+				free(destDir);
 			return -1;
 		}
 
@@ -493,6 +520,8 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		if (dirblock[k].file_name[0] != '\0')
 		{
 			std::cerr << "ERROR! No more space for dir_entries in the root block." << std::endl;
+			free(sourceDir);
+			free(destDir);
 			return -1;
 		}
 		//Put the source directory in the empty spot, after changing its name.
@@ -548,7 +577,10 @@ int FS::mv(std::string sourcepath, std::string destpath)
 		dirblock[k] = dir_entry();
 
 		//Write it back to disk after removing the old dir_entry.
+		disk.write(FAT_BLOCK, (uint8_t*)fat);
 		disk.write(sourceblockNr, (uint8_t*)buff);
+		free(sourceDir);
+		free(destDir);
 
 		return 0;
 	}
@@ -576,6 +608,9 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				if (replaced_dir->type == TYPE_DIR)
 				{
 					std::cerr << "Error! The filename is taken by a folder in the destination folder." << std::endl;
+					free(sourceDir);
+					free(destDir);
+					free(replaced_dir);
 					return -1;
 				}
 				//Overwrite the file. UPDATE FAT TABLE.
@@ -594,7 +629,6 @@ int FS::mv(std::string sourcepath, std::string destpath)
 						save = fat[i];
 						fat[i] = FAT_FREE;
 					}
-					//Remove first fat entry??? in fat[replaced_dir->first_blk]
 					fat[replaced_dir->first_blk] = FAT_FREE;
 
 					//Add the dir to the destination.
@@ -639,7 +673,9 @@ int FS::mv(std::string sourcepath, std::string destpath)
 					{
 						//Remove the slash at the front.
 						shortsource.pop_back();
-						sourceblockNr = get_entry(shortsource)->first_blk;
+						dir_entry* shortsourceDir = get_entry(shortsource);
+						sourceblockNr = shortsourceDir->first_blk;
+						free(shortsourceDir);
 					}
 
 					//Create a buffer
@@ -659,7 +695,10 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 					//Write it back to disk after removing the old dir_entry.
 					disk.write(sourceblockNr, (uint8_t*)buff);
-
+					disk.write(FAT_BLOCK, (uint8_t*)fat);
+					free(sourceDir);
+					free(destDir);
+					free(replaced_dir);
 					return 0;
 				}
 			}
@@ -685,6 +724,9 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				if (dirblock[k].file_name[0] != '\0')
 				{
 					std::cerr << "ERROR! No more space for dir_entries in the block." << std::endl;
+					free(sourceDir);
+					free(destDir);
+					free(replaced_dir);
 					return -1;
 				}
 				//Put the source directory in the empty spot, after changing its name.
@@ -713,7 +755,9 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				{
 					//Remove the slash at the front.
 					shortsource.pop_back();
-					sourceblockNr = get_entry(shortsource)->first_blk;
+					dir_entry* shortsourceDir = get_entry(shortsource);
+					sourceblockNr = shortsourceDir->first_blk;
+					free(shortsourceDir);
 				}
 
 				//Create a buffer
@@ -732,8 +776,11 @@ int FS::mv(std::string sourcepath, std::string destpath)
 				dirblock[k] = dir_entry();
 
 				//Write it back to disk after removing the old dir_entry.
+				disk.write(FAT_BLOCK, (uint8_t*)fat);
 				disk.write(sourceblockNr, (uint8_t*)buff);
-
+				free(sourceDir);
+				free(destDir);
+				free(replaced_dir);
 				return 0;
 			}
 		}
@@ -759,6 +806,10 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			if (destFolder->type == TYPE_FILE || !destFolder)
 			{
 				std::cerr << "Error! The destination path does not exist!" << std::endl;
+				free(sourceDir);
+				free(destDir);
+				if (destFolder->type == TYPE_FILE)
+					free(destFolder);
 				return -1;
 			}
 
@@ -821,7 +872,9 @@ int FS::mv(std::string sourcepath, std::string destpath)
 			{
 				//Remove the slash at the front.
 				shortsource.pop_back();
-				sourceblockNr = get_entry(shortsource)->first_blk;
+				dir_entry* shortsourceDir = get_entry(shortsource);
+				sourceblockNr = shortsourceDir->first_blk;
+				free(shortsourceDir);
 			}
 
 			//Create a buffer
@@ -841,7 +894,10 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 			//Write it back to disk after removing the old dir_entry.
 			disk.write(sourceblockNr, (uint8_t*)buff);
-
+			disk.write(FAT_BLOCK, (uint8_t*)fat);
+			free(sourceDir);
+			free(destDir);
+			free(destFolder);
 			return 0;
 		}
 	}
@@ -895,18 +951,18 @@ int FS::rm(std::string filepath)
 		save = fat[i];
 		fat[i] = FAT_FREE;
 	}
-	//Remove first fat entry??? in fat[entry->first_blk]
 	fat[entry->first_blk] = FAT_FREE;
 
 	entry->access_rights = 0u;
 	for (size_t i = 0; i < 56; i++)
 		entry->file_name[i] = '\0';
 	entry->first_blk = 0u;
-	//uint32_t tempSize = entry->size; //Save the size for the update function.
 	entry->size = 0u;
 	entry->type = TYPE_FILE;
 	disk.write(currentDir->first_blk, block);
+	disk.write(FAT_BLOCK, (uint8_t*)fat);
 
+	free(currentDir);
 	return 0;
 }
 
@@ -922,12 +978,18 @@ int FS::append(std::string filepath1, std::string filepath2)
 	if (!entry1 or !entry2)
 	{
 		std::cerr << "Path not valid." << std::endl;
+		if(entry1)
+			free(entry1);
+		if(entry2)
+			free(entry2);
 		return -1;
 	}
 
 	if (!(entry2->access_rights & WRITE))
 	{
 		std::cerr << "Error! You do not have access rights to write to that file. Therefore you can not copy it." << std::endl;
+		free(entry1);
+		free(entry2);
 		return -1;
 	}
 
@@ -971,6 +1033,10 @@ int FS::append(std::string filepath1, std::string filepath2)
 		}
 
 		disk.write(parententry->first_blk, file1);
+		disk.write(FAT_BLOCK, (uint8_t*)fat);
+		free(entry1);
+		free(entry2);
+		free(parententry);
 		return 0;
 	}
 	else
@@ -1031,6 +1097,10 @@ int FS::append(std::string filepath1, std::string filepath2)
 	}
 
 	disk.write(parententry->first_blk, file1);
+	disk.write(FAT_BLOCK, (uint8_t*)fat);
+	free(entry1);
+	free(entry2);
+	free(parententry);
 	return 0;
 }
 
@@ -1044,6 +1114,7 @@ int FS::mkdir(std::string dirpath)
 	if (currentDir)
 	{
 		std::cerr << "Error! That name already exists!" << std::endl;
+		free(currentDir);
 		return -1;
 	}
 
@@ -1087,6 +1158,7 @@ int FS::mkdir(std::string dirpath)
 	if (currentblock[k].file_name[0] != '\0')
 	{
 		std::cerr << "ERROR! No more space for dir_entries in the current block." << std::endl;
+		free(currentDir);
 		return -1;
 	}
 	//Put the new directory in the empty spot.
@@ -1108,6 +1180,7 @@ int FS::mkdir(std::string dirpath)
 	fat[empty] = FAT_EOF;
 	disk.write(FAT_BLOCK, (uint8_t*)fat);
 
+	free(currentDir);
 	return 0;
 }
 
@@ -1117,7 +1190,8 @@ int FS::cd(std::string dirpath)
 	///TODO: Rerwrite this whole finction since we do not have a folder named root anymore. And there is a simpler way of doing this.
 	std::cout << "FS::cd(" << dirpath << ")\n";
 
-	if (!get_entry(dirpath)) //Checks if path is valid.
+	dir_entry* destDir = get_entry(dirpath);
+	if (!destDir) //Checks if path is valid.
 		return -1;
 
 	if (dirpath.back() != '/')
@@ -1144,6 +1218,8 @@ int FS::cd(std::string dirpath)
 			newpos = dirpath.find("/", newpos);
 		}
 	}
+
+	free(destDir);
 	return 0;
 }
 
@@ -1217,6 +1293,8 @@ int FS::chmod(std::string accessrights, std::string filepath)
 
 	disk.write(dirtoload->first_blk, block);
 
+	free(valid);
+	free(dirtoload);
 	return 0;
 }
 
