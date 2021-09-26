@@ -1556,7 +1556,7 @@ dir_entry* FS::get_entry(std::string filepath)
 	dir_entry* it = (dir_entry*)block;
 	for (auto&& s : pathvec)
 	{
-		for (; it->file_name[0] != '\0'; it++)
+		for (size_t i = 0; i < (size_t)std::floor(BLOCK_SIZE / sizeof(dir_entry)); it++, i++)
 		{
 			if (s == "/" && pathvec.size() != 1)
 			{
