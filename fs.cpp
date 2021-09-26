@@ -1223,7 +1223,13 @@ int FS::cd(std::string dirpath)
 	dir_entry* destDir = get_entry(dirpath);
 	if (!destDir) //Checks if path is valid.
 		return -1;
-
+	if(destDir->type == TYPE_FILE)
+	{
+		std::cerr << "ERROR! Not a directory." << std::endl;
+		free(destDir);
+		return -1;
+	}
+	
 	if (dirpath.back() != '/')
 		dirpath.append("/");
 	if (dirpath[0] == '/') //Absolute path.
