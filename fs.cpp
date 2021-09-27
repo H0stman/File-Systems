@@ -1143,6 +1143,11 @@ int FS::mkdir(std::string dirpath)
 {
 	std::cout << "FS::mkdir(" << dirpath << ")\n";
 
+	auto pathvec = split_path(dirpath);
+	auto cpathvec = split_path(path);
+	if (pathvec[0] != "/")
+		dirpath = path + dirpath;
+
 	dir_entry* currentDir = get_entry(dirpath);
 	if (currentDir)
 	{
@@ -1151,14 +1156,17 @@ int FS::mkdir(std::string dirpath)
 		return -1;
 	}
 
-	auto pathvec = split_path(dirpath);
-	auto cpathvec = split_path(path);
-	if (pathvec[0] != "/")
-		pathvec.insert(pathvec.begin(), cpathvec.begin(), cpathvec.end());
+	std::string parentpath = dirpath.substr(0u, dirpath.find_last_of('/') + 1);
 
 	//Get the name of the new dir.
 	std::string temppath = pathvec.back();
-	currentDir = get_entry(path);
+	currentDir = get_entry(parentpath);
+	if (!currentDir)
+	{
+		std::cerr << "Error! Path not valid!" << std::endl;
+		free(currentDir);
+		return -1;
+	}
 	//New directory
 	dir_entry newDir;
 	temppath.copy(newDir.file_name, 56);
@@ -1172,7 +1180,7 @@ int FS::mkdir(std::string dirpath)
 	dir_entry returnDir;
 	returnDir.file_name[0] = '.';
 	returnDir.file_name[1] = '.';
-	returnDir.first_blk = currentDir->first_blk; // kanske fel.
+	returnDir.first_blk = currentDir->first_blk;
 	returnDir.size = 0;
 	returnDir.type = TYPE_DIR;
 	returnDir.access_rights = READ | WRITE | EXECUTE;
@@ -1239,9 +1247,7 @@ int FS::cd(std::string dirpath)
 	else //Relative path
 	{
 		size_t newpos = dirpath.find('/'), oldpos = 0;
-		std::string dir = "";
-		dir = dirpath.substr(oldpos, newpos - oldpos);
-		for (; newpos != std::string::npos; dir = dirpath.substr(oldpos, newpos - oldpos))
+		for (std::string dir = dirpath.substr(oldpos, newpos - oldpos); newpos != std::string::npos; dir = dirpath.substr(oldpos, newpos - oldpos))
 		{
 			if (!dir.compare(".."))
 			{
