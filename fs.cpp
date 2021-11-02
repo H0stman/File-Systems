@@ -67,8 +67,19 @@ int FS::create(std::string filepath)
 
 	//Read input from user.
 	std::string input = "", result = "";
+	bool firstLine = true;
 	while (getline(std::cin, input) and !input.empty())
+	{
+		if (firstLine)
+		{
+			firstLine = false;
+		}
+		else
+		{
+			result += '\n';
+		}
 		result += input;
+	}
 
 	//Calculate how many blocks will be needed for the string.
 	size_t numBlocks = std::ceil((float)result.size() / (float)BLOCK_SIZE);
@@ -314,7 +325,7 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 
 	if (!destDir)
 	{
-		std::string parentpath = path + destfilepath;
+		std::string parentpath = destfilepath;
 		parentpath = parentpath.substr(0u, parentpath.find_last_of('/') + 1);
 		destDir = get_entry(parentpath);
 		if (!destDir)
@@ -471,7 +482,7 @@ int FS::mv(std::string sourcepath, std::string destpath)
 
 	dir_entry* sourceDir = get_entry(sourcepath);
 	//If it is a directory or doesnt exist at all.
-	if (sourceDir->type == TYPE_DIR || !sourceDir)
+	if (!sourceDir || sourceDir->type == TYPE_DIR)
 	{
 		std::cerr << "Error! The source file does not exist!" << std::endl;
 		free(sourceDir);
