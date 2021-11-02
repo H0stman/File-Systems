@@ -15,8 +15,6 @@ FS::~FS()
 // formats the disk, i.e., creates an empty file system
 int FS::format()
 {
-	std::cout << "FS::format()\n";
-
 	//Set the whole disk to 0.
 	int nrBlocks = disk.get_no_blocks();
 	uint8_t zeroblob[BLOCK_SIZE] = { 0 };
@@ -54,8 +52,6 @@ int FS::format()
 // written on the following rows (ended with an empty row)
 int FS::create(std::string filepath)
 {
-	std::cout << "FS::create(" << filepath << ")\n";
-
 	//Check if the filepath entered already exists.
 	if (find_dir_entry(filepath).file_name[0] != '\0')
 	{
@@ -186,8 +182,6 @@ int FS::create(std::string filepath)
 // cat <filepath> reads the content of a file and prints it on the screen
 int FS::cat(std::string filepath)
 {
-	std::cout << "FS::cat(" << filepath << ")\n";
-
 	dir_entry entry = find_dir_entry(filepath); //Get the dir entry for the filepath entered.
 	if (entry.file_name[0] == '\0')
 	{
@@ -222,8 +216,6 @@ int FS::cat(std::string filepath)
 // ls lists the content in the currect directory (files and sub-directories)
 int FS::ls()
 {
-	std::cout << "FS::ls()\n";
-
 	//Read the current paths dir and block.
 	uint8_t buff[BLOCK_SIZE] = { 0 };
 	dir_entry* dirblock = (dir_entry*)buff;
@@ -283,8 +275,6 @@ int FS::ls()
 // <sourcefilepath> to a new file <destfilepath>
 int FS::cp(std::string sourcefilepath, std::string destfilepath)
 {
-	std::cout << "FS::cp(" << sourcefilepath << "," << destfilepath << ")\n";
-
 	//Find the dir_entry for the source.
 	dir_entry sourceDir = find_dir_entry(sourcefilepath);
 	if (sourceDir.file_name[0] == '\0')
@@ -426,8 +416,6 @@ int FS::cp(std::string sourcefilepath, std::string destfilepath)
 // or moves the file <sourcepath> to the directory <destpath> (if dest is a directory)
 int FS::mv(std::string sourcepath, std::string destpath)
 {
-	std::cout << "FS::mv(" << sourcepath << "," << destpath << ")\n";
-
 	dir_entry currentDir;
 	destpath = path + destpath;
 	std::string tempPath = destpath;
@@ -508,8 +496,6 @@ int FS::mv(std::string sourcepath, std::string destpath)
 // rm <filepath> removes / deletes the file <filepath>
 int FS::rm(std::string filepath)
 {
-	std::cout << "FS::rm(" << filepath << ")\n";
-
 	uint8_t block[BLOCK_SIZE] = { 0 };
 	std::string temppath = "";
 
@@ -577,7 +563,6 @@ int FS::rm(std::string filepath)
 // the end of file <filepath2>. The file <filepath1> is unchanged.
 int FS::append(std::string filepath1, std::string filepath2)
 {
-	std::cout << "FS::append(" << filepath1 << "," << filepath2 << ")\n";
 	dir_entry entry1 = find_dir_entry(filepath1);
 	dir_entry entry2 = find_dir_entry(filepath2);
 	if (entry1.file_name[0] == '\0' or entry2.file_name[0] == '\0')
@@ -672,8 +657,6 @@ int FS::append(std::string filepath1, std::string filepath2)
 // in the current directory
 int FS::mkdir(std::string dirpath)
 {
-	std::cout << "FS::mkdir(" << dirpath << ")\n";
-
 	dir_entry currentDir = find_dir_entry(dirpath);
 	if (currentDir.file_name[0] != '\0')
 	{
@@ -751,9 +734,6 @@ int FS::mkdir(std::string dirpath)
 // cd <dirpath> changes the current (working) directory to the directory named <dirpath>
 int FS::cd(std::string dirpath)
 {
-	///TODO: Rerwrite this whole finction since we do not have a folder named root anymore. And there is a simpler way of doing this.
-	std::cout << "FS::cd(" << dirpath << ")\n";
-
 	if (find_dir_entry(dirpath).file_name[0] == '\0') //Checks if path is valid.
 		return -1;
 
@@ -788,7 +768,6 @@ int FS::cd(std::string dirpath)
 // directory, including the currect directory name
 int FS::pwd()
 {
-	std::cout << "FS::pwd()\n";
 	std::cout << path << std::endl;
 	return 0;
 }
@@ -797,7 +776,6 @@ int FS::pwd()
 // file <filepath> to <accessrights>.
 int FS::chmod(std::string accessrights, std::string filepath)
 {
-	std::cout << "FS::chmod(" << accessrights << "," << filepath << ")\n";
 	dir_entry valid = find_dir_entry(filepath);
 	if (*valid.file_name == '\0')
 		return 1;
